@@ -68,22 +68,35 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 
 // Database connection
+let cachedDb = null;
+
 const connectToDatabase = async () => {
+  if (cachedDb) {
+    return cachedDb;
+  }
+  
   try {
     await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/login', {
-      serverSelectionTimeoutMS: 5000,
-      socketTimeoutMS: 30000,
-      connectTimeoutMS: 10000,
+      serverSelectionTimeoutMS: 30000,
+      socketTimeoutMS: 45000,
+      connectTimeoutMS: 30000,
+      maxPoolSize: 10,
+      retryWrites: true,
     });
+    cachedDb = mongoose.connection;
     console.log('MongoDB connected successfully');
+    return cachedDb;
   } catch (error) {
     console.error('MongoDB connection error:', error);
-    process.exit(1);
+    if (process.env.NODE_ENV !== 'production') {
+      process.exit(1);
+    }
+    throw error;
   }
 };
 
-// Connect to database once on startup
-connectToDatabase();
+// Connect to database
+connectToDatabase().catch(console.error);
 
 // Routes
 app.use('/api/auth', authRoutes);
