@@ -46,7 +46,7 @@ const app = express();
 const allowedOrigins = [
   "http://localhost:5173",
   "https://ashoka-backend.vercel.app",
-  "https://ashokacrm.vercel.app/",
+  "https://ashokacrm.vercel.app",
 ];
 app.use(
   cors({
