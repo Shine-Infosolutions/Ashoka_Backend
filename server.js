@@ -66,37 +66,40 @@ app.use(express.json({ limit: '50mb' }));
 // Serve uploaded files for fallback method
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-
 // Database connection
-let cachedDb = null;
+let isConnected = false;
 
 const connectToDatabase = async () => {
-  if (cachedDb) {
-    return cachedDb;
+  if (isConnected) {
+    return;
   }
   
   try {
-    await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/login', {
-      serverSelectionTimeoutMS: 30000,
+    await mongoose.connect(process.env.MONGO_URI, {
+      serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
-      connectTimeoutMS: 30000,
-      maxPoolSize: 10,
-      retryWrites: true,
+      bufferCommands: false,
     });
-    cachedDb = mongoose.connection;
+    isConnected = true;
     console.log('MongoDB connected successfully');
-    return cachedDb;
   } catch (error) {
     console.error('MongoDB connection error:', error);
-    if (process.env.NODE_ENV !== 'production') {
-      process.exit(1);
-    }
     throw error;
   }
 };
 
-// Connect to database
+// Connect to database immediately
 connectToDatabase().catch(console.error);
+
+// Middleware to ensure DB connection
+app.use(async (req, res, next) => {
+  try {
+    await connectToDatabase();
+    next();
+  } catch (error) {
+    res.status(500).json({ error: 'Database connection failed' });
+  }
+});
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -140,7 +143,7 @@ app.use('/api/banquet-categories', banquetCategoryRoutes);
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok',
-    dbConnected: !!cachedDb
+    dbConnected: isConnected
   });
 });
 
