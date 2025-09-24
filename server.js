@@ -38,7 +38,7 @@ const banquetBookingRoutes = require('./src/routes/banquetBookingRoutes.js');
 const planLimitRoutes = require('./src/routes/planLimitRoutes.js');
 const menuItemRoutes = require('./src/routes/menuItemRoutes.js');
 const banquetCategoryRoutes = require('./src/routes/banquetCategoryRoutes.js');
-const cashTransactionRoutes = require('./src/routes/cashTransactionRoutes.js');
+const cashTransactionRoutes = require('./src/routes/CashTransactionRoutes.js');
 const dashboardRoutes = require('./src/routes/dashboardRoutes.js');
 const path = require('path');
 // Initialize express app
@@ -138,7 +138,7 @@ app.use('/api/banquet-bookings', banquetBookingRoutes);
 app.use('/api/plan-limits', planLimitRoutes);
 app.use('/api/menu-items', menuItemRoutes);
 app.use('/api/banquet-categories', banquetCategoryRoutes);
-app.use('/api/cash-transactions', cashTransactionRoutes); 
+app.use('/api/cash-transactions', cashTransactionRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 
 
