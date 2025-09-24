@@ -41,6 +41,9 @@ const banquetCategoryRoutes = require('./src/routes/banquetCategoryRoutes.js');
 const cashTransactionRoutes = require('./src/routes/CashTransactionRoutes.js');
 const dashboardRoutes = require('./src/routes/dashboardRoutes.js');
 const wastageRoutes = require('./src/routes/wastageRoutes.js');
+const attendanceRoutes = require('./src/routes/attendanceRoutes.js');
+const payrollRoutes = require('./src/routes/payrollRoutes.js');
+const staffRoutes = require('./src/routes/staffRoutes.js');
 const path = require('path');
 // Initialize express app
 const app = express();
@@ -142,6 +145,9 @@ app.use('/api/banquet-categories', banquetCategoryRoutes);
 app.use('/api/cash-transactions', cashTransactionRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/wastage', wastageRoutes);
+app.use('/api/attendance', attendanceRoutes);
+app.use('/api/payroll', payrollRoutes);
+app.use('/api/staff', staffRoutes);
 
 
 // Health check endpoint
