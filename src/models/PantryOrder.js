@@ -41,7 +41,7 @@ const PantryOrderSchema = new mongoose.Schema({
   },
   orderType: {
     type: String,
-    enum: ['room_service', 'pickup'],
+    enum: ['Kitchen to Pantry', 'Pantry to Reception'],
     default: 'room_service'
   },
   specialInstructions: {
