@@ -40,6 +40,7 @@ const menuItemRoutes = require('./src/routes/menuItemRoutes.js');
 const banquetCategoryRoutes = require('./src/routes/banquetCategoryRoutes.js');
 const cashTransactionRoutes = require('./src/routes/CashTransactionRoutes.js');
 const dashboardRoutes = require('./src/routes/dashboardRoutes.js');
+const wastageRoutes = require('./src/routes/wastageRoutes.js');
 const path = require('path');
 // Initialize express app
 const app = express();
@@ -140,6 +141,7 @@ app.use('/api/menu-items', menuItemRoutes);
 app.use('/api/banquet-categories', banquetCategoryRoutes);
 app.use('/api/cash-transactions', cashTransactionRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/wastage', wastageRoutes);
 
 
 // Health check endpoint
