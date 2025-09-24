@@ -137,7 +137,7 @@ app.use('/api/banquet-bookings', banquetBookingRoutes);
 app.use('/api/plan-limits', planLimitRoutes);
 app.use('/api/menu-items', menuItemRoutes);
 app.use('/api/banquet-categories', banquetCategoryRoutes);
-app.use('/api/cash-transactions', cashTransactionRoutes);
+app.use('/api/cash-transactions', cashTransactionRoutes); //added
 
 
 // Health check endpoint
