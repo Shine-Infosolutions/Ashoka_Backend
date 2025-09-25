@@ -101,3 +101,22 @@ exports.getAttendance = async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 };
+
+/**
+ * Get all attendance records
+ */
+exports.getAllAttendance = async (req, res) => {
+  try {
+    const records = await Attendance.find()
+      .sort({ date: -1 }) // latest attendance first
+      .populate({
+        path: 'staffId',
+        populate: { path: 'userId', select: 'username email role' }
+      });
+
+    res.json(records);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
