@@ -2,9 +2,6 @@ const Attendance = require('../models/Attendance');
 const Payroll = require('../models/Payroll');
 const Staff = require('../models/Staff');
 
-// Helper function to check Sunday
-const isSunday = (date) => new Date(date).getDay() === 0;
-
 /**
  * Generate monthly payroll by staffId
  */
@@ -26,48 +23,56 @@ exports.generatePayroll = async (req, res) => {
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 1); // exclusive
 
-    // Fetch attendance records
+    // Fetch attendance records for the month
     const attendanceRecords = await Attendance.find({
       staffId,
       date: { $gte: startDate, $lt: endDate }
     });
 
-    // Prepare payroll details
-    let totalDeduction = 0;
+    // Map attendance by day
+    const attMap = {};
+    attendanceRecords.forEach(att => {
+      attMap[att.date.toDateString()] = att;
+    });
+
+    const daysInMonth = new Date(year, month, 0).getDate();
     let workingDays = 0;
     let paidDays = 0;
     let unpaidLeaves = 0;
+    let totalDeduction = 0;
     const details = [];
-
-    // Map attendance by day for missing days
-    const daysInMonth = new Date(year, month, 0).getDate();
-    const attMap = {};
-    attendanceRecords.forEach(att => attMap[att.date.toDateString()] = att);
 
     for (let d = 1; d <= daysInMonth; d++) {
       const currentDate = new Date(year, month - 1, d);
-      if (isSunday(currentDate)) continue; // skip Sundays
-
-      workingDays++;
       const dayStr = currentDate.toDateString();
-      const att = attMap[dayStr];
+
+      // Skip Sundays from workingDays but count as paid
+      if (currentDate.getDay() === 0) {
+        details.push({ date: currentDate, status: 'present', leaveType: null, deduction: 0 });
+        paidDays++; // Sundays are paid
+        continue;
+      }
+
+      workingDays++; // Only weekdays count
 
       let status = 'absent';
       let leaveType = null;
       let deduction = 0;
 
+      const att = attMap[dayStr];
       if (att) {
         status = att.status;
         leaveType = att.leaveType || null;
       }
 
-      if (status === 'absent' || (status === 'leave' && leaveType === 'unpaid')) {
+      if (status === 'absent') {
         deduction = monthlySalary / 30;
         unpaidLeaves++;
       } else if (status === 'half-day') {
-        deduction = monthlySalary / 30 / 2;
+        deduction = (monthlySalary / 30) / 2;
         paidDays += 0.5;
       } else {
+        // present or paid leave (sick/paid)
         paidDays++;
       }
 

@@ -11,49 +11,45 @@ exports.markAttendance = async (req, res) => {
   try {
     const { staffId, date, status, leaveType, checkIn, checkOut, remarks } = req.body;
 
-    // Validate staffId
     if (!staffId) return res.status(400).json({ message: 'staffId is required' });
 
     const staff = await Staff.findById(staffId).populate('userId', 'username role');
     if (!staff) return res.status(404).json({ message: 'Staff not found' });
-
-    // Only staff role can have attendance
-    if (!staff.userId || staff.userId.role !== 'staff') 
+    if (!staff.userId || staff.userId.role !== 'staff')
       return res.status(400).json({ message: 'Only staff can have attendance' });
 
-    // Validate status
     const validStatus = ['present', 'absent', 'half-day', 'leave'];
-    if (!status || !validStatus.includes(status)) {
+    if (!status || !validStatus.includes(status))
       return res.status(400).json({ message: `Invalid status. Allowed: ${validStatus.join(', ')}` });
-    }
 
-    // Validate leaveType if status is leave
     const validLeaveTypes = ['casual', 'sick', 'paid', 'unpaid', null];
-    if (status === 'leave' && leaveType && !validLeaveTypes.includes(leaveType)) {
+    if (status === 'leave' && leaveType && !validLeaveTypes.includes(leaveType))
       return res.status(400).json({ message: `Invalid leaveType. Allowed: ${validLeaveTypes.join(', ')}` });
-    }
 
-    // Prevent marking Sunday absence
-    if (isSunday(date) && status === 'absent') {
-      return res.status(400).json({ message: 'Cannot mark absence on Sunday' });
-    }
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    const nextDay = new Date(d);
+    nextDay.setDate(nextDay.getDate() + 1);
 
-    // Check if attendance exists for this staff + date
-    let attendance = await Attendance.findOne({ staffId, date: new Date(date) });
+    // Check attendance for this day
+    let attendance = await Attendance.findOne({
+      staffId,
+      date: { $gte: d, $lt: nextDay }
+    });
 
     if (attendance) {
-      // Update existing
+      // Update
       attendance.status = status;
-      attendance.leaveType = leaveType || attendance.leaveType;
+      attendance.leaveType = status === 'leave' ? leaveType : null;
       attendance.checkIn = checkIn || attendance.checkIn;
       attendance.checkOut = checkOut || attendance.checkOut;
       attendance.remarks = remarks || attendance.remarks;
       await attendance.save();
     } else {
-      // Create new
+      // Create
       attendance = new Attendance({
         staffId,
-        date,
+        date: d,
         status,
         leaveType: status === 'leave' ? leaveType : null,
         checkIn,
