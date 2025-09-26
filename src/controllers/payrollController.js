@@ -2,9 +2,6 @@ const Attendance = require('../models/Attendance');
 const Payroll = require('../models/Payroll');
 const Staff = require('../models/Staff');
 
-/**
- * Generate monthly payroll by staffId
- */
 exports.generatePayroll = async (req, res) => {
   try {
     const { staffId, month, year } = req.body;
@@ -13,17 +10,13 @@ exports.generatePayroll = async (req, res) => {
     if (!month || month < 1 || month > 12) return res.status(400).json({ message: 'Invalid month' });
     if (!year || year < 2000) return res.status(400).json({ message: 'Invalid year' });
 
-    // Fetch staff
     const staff = await Staff.findById(staffId).populate('userId', 'username email role');
     if (!staff) return res.status(404).json({ message: 'Staff not found' });
 
     const monthlySalary = staff.salary;
-
-    // Start & end of month
     const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 1); // exclusive
+    const endDate = new Date(year, month, 1);
 
-    // Fetch attendance records for the month
     const attendanceRecords = await Attendance.find({
       staffId,
       date: { $gte: startDate, $lt: endDate }
@@ -36,7 +29,12 @@ exports.generatePayroll = async (req, res) => {
     });
 
     const daysInMonth = new Date(year, month, 0).getDate();
-    let workingDays = 0;
+
+    // Fixed configuration based on requirement
+    const totalDaysInMonth = 30;    // Salary always divided by 30 days
+    const totalSundays = 4;         // 4 Sundays always paid and excluded from workingDays
+    const workingDays = totalDaysInMonth - totalSundays; // 26
+
     let paidDays = 0;
     let unpaidLeaves = 0;
     let totalDeduction = 0;
@@ -46,33 +44,39 @@ exports.generatePayroll = async (req, res) => {
       const currentDate = new Date(year, month - 1, d);
       const dayStr = currentDate.toDateString();
 
-      // Skip Sundays from workingDays but count as paid
       if (currentDate.getDay() === 0) {
         details.push({ date: currentDate, status: 'present', leaveType: null, deduction: 0 });
-        paidDays++; // Sundays are paid
+        paidDays++;
         continue;
-      }
+     }     
 
-      workingDays++; // Only weekdays count
-
+      // For non-Sundays
+      let att = attMap[dayStr];
       let status = 'absent';
       let leaveType = null;
       let deduction = 0;
 
-      const att = attMap[dayStr];
       if (att) {
         status = att.status;
         leaveType = att.leaveType || null;
       }
 
       if (status === 'absent') {
-        deduction = monthlySalary / 30;
+        deduction = monthlySalary / totalDaysInMonth;
         unpaidLeaves++;
       } else if (status === 'half-day') {
-        deduction = (monthlySalary / 30) / 2;
+        deduction = (monthlySalary / totalDaysInMonth) / 2;
         paidDays += 0.5;
+      } else if (status === 'leave') {
+        if (leaveType === 'unpaid') {
+          deduction = monthlySalary / totalDaysInMonth;
+          unpaidLeaves++;
+        } else {
+          // paid leave types: casual, sick, paid => no deduction
+          paidDays++;
+        }
       } else {
-        // present or paid leave (sick/paid)
+        // present full day
         paidDays++;
       }
 
@@ -82,7 +86,6 @@ exports.generatePayroll = async (req, res) => {
 
     const netSalary = monthlySalary - totalDeduction;
 
-    // Create or update payroll
     let payroll = await Payroll.findOne({ staffId, month, year });
     if (payroll) {
       payroll.totalSalary = monthlySalary;
@@ -110,7 +113,6 @@ exports.generatePayroll = async (req, res) => {
     }
 
     res.json({ message: 'Payroll generated', payroll });
-
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Server error' });

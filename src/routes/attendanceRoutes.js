@@ -7,5 +7,7 @@ router.post('/mark', attendanceController.markAttendance);
 
 // Get attendance by user or date
 router.get('/get', attendanceController.getAttendance);
+router.get('/all', attendanceController.getAllAttendance);
+router.patch('/status', attendanceController.updateAttendanceStatus);
 
 module.exports = router;
