@@ -67,7 +67,7 @@ router.post(
   housekeepingController.reportIssue
 );
 // POST: Create a new inspection (minibar or floor-checklist)
-router.post('/roominspection', housekeepingController.createRoomInspection);
+router.post('/roominspection', housekeepingController.getAllRoomInspections);
 router.post('/room-inspection', housekeepingController.createRoomInspection);
 
 // Resolve reported issue
