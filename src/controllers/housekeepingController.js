@@ -45,6 +45,69 @@ exports.getChecklistByRoom = async (req, res) => {
   }
 };
 
+exports.getAllRoomInspections = async (req, res) => {
+  try {
+    const inspections = await RoomInspection.find()
+      .populate('roomId')
+      .populate('bookingId')
+      .populate('inspectedBy', 'username')
+      .sort({ createdAt: -1 });
+
+    res.json({ success: true, inspections });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.getRoomInspectionById = async (req, res) => {
+  try {
+    const { inspectionId } = req.params;
+
+    const inspection = await RoomInspection.findById(inspectionId)
+      .populate('roomId')
+      .populate('bookingId')
+      .populate('inspectedBy', 'username');
+
+    if (!inspection) {
+      return res.status(404).json({ error: 'RoomInspection not found' });
+    }
+
+    res.json({ success: true, inspection });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.getRoomInspectionsByRoom = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+
+    const inspections = await RoomInspection.find({ roomId })
+      .populate('bookingId')
+      .populate('inspectedBy', 'username')
+      .sort({ createdAt: -1 });
+
+    res.json({ success: true, inspections });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.getRoomInspectionsByBooking = async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+
+    const inspections = await RoomInspection.find({ bookingId })
+      .populate('roomId')
+      .populate('inspectedBy', 'username')
+      .sort({ createdAt: -1 });
+
+    res.json({ success: true, inspections });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 // 🔹 POST Inspection Submission
 exports.createRoomInspection = async (req, res) => {
   try {
