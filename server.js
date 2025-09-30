@@ -73,34 +73,21 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 // Database connection
 let isConnected = false;
 
-const connectToDatabase = async () => {
-  if (isConnected) {
-    return;
-  }
-
-  try {
-    await mongoose.connect(process.env.MONGO_URI, {
-      serverSelectionTimeoutMS: 30000,
-      socketTimeoutMS: 45000,
-    });
-    isConnected = true;
-    console.log("MongoDB connected successfully");
-  } catch (error) {
-    console.error("MongoDB connection error:", error);
-    throw error;
-  }
-};
-
-// Connect to database immediately
-connectToDatabase().catch(console.error);
-
-// Middleware to ensure DB connection
+// Middleware to ensure DB connection before each request
 app.use(async (req, res, next) => {
   try {
-    await connectToDatabase();
+    if (!isConnected) {
+      await mongoose.connect(process.env.MONGO_URI, {
+        serverSelectionTimeoutMS: 30000,
+        socketTimeoutMS: 45000,
+      });
+      isConnected = true;
+      console.log('MongoDB connected successfully');
+    }
     next();
   } catch (error) {
-    res.status(500).json({ error: "Database connection failed" });
+    console.error('Database connection failed:', error);
+    res.status(500).json({ error: 'Database connection failed' });
   }
 });
 
