@@ -1,7 +1,6 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User.js");
-const Staff = require("../models/Staff.js");
 
 // Helper to normalize department into array of objects
 const normalizeDepartment = (department) => {
@@ -81,15 +80,7 @@ exports.register = async (req, res) => {
     const user = new User(userData);
     await user.save();
 
-    // ✅ Create Staff document if role is staff
-    if (role === "staff") {
-      const staff = new Staff({
-        userId: user._id,
-        salary: salary || 0,
-        department: normalizeDepartment(department),
-      });
-      await staff.save();
-    }
+
 
     res.status(201).json({ message: "User registered successfully", user });
   } catch (err) {
@@ -120,14 +111,7 @@ exports.login = async (req, res) => {
       { expiresIn: "1d" }
     );
 
-    // ✅ If staff, get linked Staff details (salary, dept)
-    let staffData = null;
-    if (user.role === "staff") {
-      const Staff = require("../models/Staff"); // require here to avoid circular dependency
-      staffData = await Staff.findOne({ userId: user._id })
-        .select("-__v")
-        .lean();
-    }
+
 
     res.json({
       token,
@@ -136,7 +120,7 @@ exports.login = async (req, res) => {
       department: user.department,
       restaurantRole: user.restaurantRole,
       username: user.username,
-      staff: staffData, // include staff details if role is staff
+
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -164,17 +148,7 @@ exports.getStaffProfile = async (req, res) => {
     };
 
     if (user.role === "staff") {
-      // Fetch staff details
-      const staff = await Staff.findOne({ userId: user._id })
-        .select("-__v")
-        .lean();
-
       responseData.departments = user.department;
-      if (staff) {
-        responseData.salary = staff.salary;
-        responseData.joiningDate = staff.joiningDate;
-        responseData.staffDept = staff.department;
-      }
     } else if (user.role === "admin") {
       responseData.departments = user.department;
       responseData.isAdmin = true;
@@ -270,10 +244,7 @@ exports.deleteUser = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // If staff, delete linked Staff document
-    if (user.role === "staff") {
-      await Staff.findOneAndDelete({ userId: user._id });
-    }
+
 
     res.json({ message: "User deleted successfully" });
   } catch (err) {
@@ -318,19 +289,7 @@ exports.updateUser = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // If user is staff, update linked Staff document
-    if (updatedUser.role === "staff") {
-      const staffUpdates = {};
-      if (updates.department) staffUpdates.department = updates.department;
-      if (updates.salary) staffUpdates.salary = updates.salary;
-      if (Object.keys(staffUpdates).length > 0) {
-        await Staff.findOneAndUpdate(
-          { userId: updatedUser._id },
-          staffUpdates,
-          { new: true }
-        );
-      }
-    }
+
 
     res.json(updatedUser);
   } catch (err) {
