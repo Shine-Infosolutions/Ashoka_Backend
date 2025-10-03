@@ -73,4 +73,4 @@ changedAt:Date
   timestamps: true // Automatically adds createdAt and updatedAt
 });
 
-module.exports = mongoose.model("Booking", bookingSchema);
+module.exports = mongoose.models.BanquetBooking || mongoose.model("BanquetBooking", bookingSchema);
