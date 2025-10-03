@@ -1,4 +1,5 @@
 const Menu = require("../models/BanquetMenu"); // adjust path as needed
+const mongoose = require("mongoose");
 
 // Get all menus
 // exports.getAllMenus = async (req, res) => {
@@ -54,9 +55,10 @@ exports.getMenuByCustomerRef = async (req, res) => {
 
 exports.getMenuByBookingId = async (req, res) => {
   const { bookingId } = req.params;
-// console.log("Fetching menu for booking ID:", bookingId);
   try {
-    const menu = await Menu.findOne({ bookingRef: bookingId }).populate("bookingRef");
+    // Convert string to ObjectId for comparison
+    const objectId = new mongoose.Types.ObjectId(bookingId);
+    const menu = await Menu.findOne({ bookingRef: objectId });
     
     if (!menu) {
       return res.status(404).json({ success: false, message: "Menu not found" });
