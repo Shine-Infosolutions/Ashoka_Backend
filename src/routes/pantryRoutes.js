@@ -46,6 +46,12 @@ router.get(
   pantryController.generateLowStockInvoice
 );
 
+router.get(
+  "/invoices/vendor",
+  authMiddleware(["admin", "staff"], ["pantry"]),
+  pantryController.generateVendorInvoice
+);
+
 // Pantry Orders Routes
 router.get(
   "/orders",
