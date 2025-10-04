@@ -72,13 +72,21 @@ exports.createPantryOrder = async (req, res) => {
       ...req.body,
       orderedBy: req.user?.id || req.body.orderedBy
     });
+
     await order.save();
-    await order.populate("orderedBy", "username email");
+
+    // Populate both orderedBy and vendorId
+    await order.populate([
+      { path: "orderedBy", select: "username email" },
+      { path: "vendorId", select: "name phone email" }
+    ]);
+
     res.status(201).json({ success: true, order });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 };
+
 
 // Get pantry orders
 exports.getPantryOrders = async (req, res) => {
