@@ -34,6 +34,10 @@ const PantryOrderSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
+  vendorId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Vendor"   // ✅ link to Vendor
+  },
   status: {
     type: String,
     enum: ['pending', 'preparing', 'ready', 'delivered', 'cancelled'],
