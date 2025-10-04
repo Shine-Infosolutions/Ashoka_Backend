@@ -70,7 +70,7 @@ exports.createPantryOrder = async (req, res) => {
   try {
     const order = new PantryOrder({
       ...req.body,
-      orderedBy: req.user.id,
+      orderedBy: req.user?.id || req.body.orderedBy
     });
     await order.save();
     await order.populate("orderedBy", "username email");
@@ -90,7 +90,8 @@ exports.getPantryOrders = async (req, res) => {
     if (status) filter.status = status;
 
     const orders = await PantryOrder.find(filter)
-      .populate("orderedBy", "username email")
+    .populate("orderedBy", "username email")
+    .populate("vendorId", "name phone email") 
       .sort({ createdAt: -1 });
 
     res.json({ success: true, orders });
@@ -123,7 +124,8 @@ exports.updatePantryOrderStatus = async (req, res) => {
     }
 
     await order.save();
-    await order.populate("orderedBy", "username email");
+    await order.populate("orderedBy", "username email")
+               .populate("vendorId", "name phone email");
 
     res.json({ success: true, order });
   } catch (error) {

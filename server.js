@@ -42,6 +42,7 @@ const wastageRoutes = require("./src/routes/wastageRoutes.js");
 const attendanceRoutes = require("./src/routes/attendanceRoutes.js");
 const payrollRoutes = require("./src/routes/payrollRoutes.js");
 const staffRoutes = require("./src/routes/staffRoutes.js");
+const vendorRoutes = require("./src/routes/vendorRoutes.js");
 const path = require("path");
 // Initialize express app
 const app = express();
@@ -133,6 +134,7 @@ app.use("/api/wastage", wastageRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/payroll", payrollRoutes);
 app.use("/api/staff", staffRoutes);
+app.use("/api/vendor", vendorRoutes); 
 
 // Health check endpoint
 app.get("/health", (req, res) => {
