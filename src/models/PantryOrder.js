@@ -1,10 +1,6 @@
 const mongoose = require('mongoose');
 
 const PantryOrderSchema = new mongoose.Schema({
-  guestName: {
-    type: String,
-    required: true
-  },
   items: [{
     itemId: {
       type: mongoose.Schema.Types.ObjectId,
