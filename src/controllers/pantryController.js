@@ -236,3 +236,18 @@ exports.generateLowStockInvoice = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// Delete a pantry order by ID
+exports.deletePantryOrder = async (req, res) => {
+  try {
+    const order = await PantryOrder.findByIdAndDelete(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({ error: "Pantry order not found" });
+    }
+
+    res.json({ success: true, message: "Pantry order deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
