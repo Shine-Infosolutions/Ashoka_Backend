@@ -87,7 +87,6 @@ exports.createPantryOrder = async (req, res) => {
   }
 };
 
-
 // Get pantry orders
 exports.getPantryOrders = async (req, res) => {
   try {
@@ -247,6 +246,47 @@ exports.deletePantryOrder = async (req, res) => {
     }
 
     res.json({ success: true, message: "Pantry order deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Generate invoice for Reception to Vendor orders
+exports.generateVendorInvoice = async (req, res) => {
+  try {
+    const vendorOrders = await PantryOrder.find({
+      orderType: 'Reception to Vendor',
+      status: { $in: ['pending', 'ready'] }
+    })
+    .populate('vendorId', 'name phone email')
+    .populate('items.itemId', 'name unit costPerUnit')
+    .populate('orderedBy', 'username email');
+
+    if (!vendorOrders.length) {
+      return res.status(404).json({ error: 'No Reception to Vendor orders found' });
+    }
+
+    const invoice = vendorOrders.map(order => ({
+      orderNumber: order.orderNumber,
+      vendor: order.vendorId ? {
+        name: order.vendorId.name,
+        phone: order.vendorId.phone,
+        email: order.vendorId.email
+      } : { name: "Unknown Vendor" },
+      totalAmount: order.totalAmount,
+      items: order.items.map(i => ({
+        name: i.itemId?.name || "Deleted Item",
+        quantity: i.quantity,
+        unit: i.itemId?.unit || "",
+        unitPrice: i.unitPrice,
+        total: i.quantity * i.unitPrice
+      })),
+      specialInstructions: order.specialInstructions,
+      orderedBy: order.orderedBy,
+      createdAt: order.createdAt
+    }));
+
+    res.json({ success: true, invoice });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
