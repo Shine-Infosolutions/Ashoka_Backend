@@ -9,8 +9,7 @@ const menuSchema = new mongoose.Schema({
   
   // Reference to booking
   bookingRef: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Booking",
+    type: mongoose.Schema.Types.Mixed,
     unique: true
   },
   customerRef: { type: String, required: true, unique: true },

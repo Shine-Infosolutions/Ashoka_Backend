@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const banquetbookingSchema = new mongoose.Schema({
+const bookingSchema = new mongoose.Schema({
   name: { type: String,  trim: true },
   email: { type: String,  trim: true },
   number: { type: String,  trim: true },
@@ -24,10 +24,11 @@ transactionId: {
   trim: true
 },
   discount:{type:Number},
+  decorationCharge: { type: Number, default: 0 },
+  musicCharge: { type: Number, default: 0 },
   hall:{
     type: String,
-    enum: ["Nirvana", "Mandala", "Conference","Lawn"], 
-    default: "Nirvana",
+    enum: ["Kitty Hall", "Banquet Hall", "Rooftop Hall","Flamingo Rooftop"], 
   },
   extraRooms: { type: Number, default: 0 },
 roomPricePerUnit: { type: Number, default: 0 },
@@ -69,8 +70,7 @@ status:String,
 changedAt:Date
  }],
 }, {
-  timestamps: true, // Automatically adds createdAt and updatedAt
-  collection: 'banquetbookings' // Specify collection name
+  timestamps: true // Automatically adds createdAt and updatedAt
 });
 
-module.exports = mongoose.model("BanquetBooking", banquetbookingSchema);
+module.exports = mongoose.models.BanquetBooking || mongoose.model("BanquetBooking", bookingSchema);
