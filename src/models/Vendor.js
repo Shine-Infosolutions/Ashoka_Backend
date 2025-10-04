@@ -20,7 +20,7 @@ const VendorSchema = new mongoose.Schema({
 UpiID: {
     type: String
   },
-  scannerCodeUrl: {
+  scannerImg: {
     type: String
   },
   isActive: {
