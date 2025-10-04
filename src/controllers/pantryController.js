@@ -68,6 +68,18 @@ exports.deletePantryItem = async (req, res) => {
 // Create pantry order (kitchen to pantry or pantry to reception)
 exports.createPantryOrder = async (req, res) => {
   try {
+    // Check and drop the problematic orderNumber index if it exists
+    try {
+      const indexes = await PantryOrder.collection.indexes();
+      const hasOrderNumberIndex = indexes.some(index => index.name === 'orderNumber_1');
+      if (hasOrderNumberIndex) {
+        await PantryOrder.collection.dropIndex('orderNumber_1');
+        console.log('Dropped orderNumber_1 index');
+      }
+    } catch (e) {
+      console.log('Index handling:', e.message);
+    }
+    
     const order = new PantryOrder({
       ...req.body,
       orderedBy: req.user?.id || req.body.orderedBy
