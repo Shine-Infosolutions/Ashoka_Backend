@@ -1,15 +1,6 @@
 const mongoose = require('mongoose');
 
 const PantryOrderSchema = new mongoose.Schema({
-  orderNumber: {
-    type: String,
-    required: true,
-    unique: true
-  },
-  roomNumber: {
-    type: String,
-    required: true
-  },
   guestName: {
     type: String,
     required: true
