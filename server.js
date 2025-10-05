@@ -134,7 +134,7 @@ app.use("/api/wastage", wastageRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/payroll", payrollRoutes);
 app.use("/api/staff", staffRoutes);
-app.use("/api/vendor", vendorRoutes); 
+app.use("/api/vendor", vendorRoutes);
 
 // Health check endpoint
 app.get("/health", (req, res) => {
