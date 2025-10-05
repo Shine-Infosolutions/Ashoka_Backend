@@ -15,10 +15,12 @@ const VendorSchema = new mongoose.Schema({
     type: String
   },
   GSTin: {
-    type: String
+    type: String,
+    trim: true
   },
-UpiID: {
-    type: String
+  UpiID: {
+    type: String,
+    trim: true
   },
   scannerImg: {
     type: String

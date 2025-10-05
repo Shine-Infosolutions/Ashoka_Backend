@@ -26,7 +26,19 @@ exports.getVendorById = async (req, res) => {
 // Create vendor
 exports.createVendor = async (req, res) => {
   try {
-    const vendor = new Vendor(req.body);
+    const { name, phone, email, address, GSTin, UpiID, scannerImg, isActive } = req.body;
+    
+    const vendor = new Vendor({
+      name,
+      phone,
+      email,
+      address,
+      GSTin,
+      UpiID,
+      scannerImg,
+      isActive: isActive !== undefined ? isActive : true
+    });
+    
     await vendor.save();
     res.status(201).json({ success: true, vendor });
   } catch (error) {
@@ -37,9 +49,22 @@ exports.createVendor = async (req, res) => {
 // Update vendor
 exports.updateVendor = async (req, res) => {
   try {
+    const { name, phone, email, address, GSTin, UpiID, scannerImg, isActive } = req.body;
+    
+    const updateData = {
+      name,
+      phone,
+      email,
+      address,
+      GSTin,
+      UpiID,
+      scannerImg,
+      isActive
+    };
+    
     const vendor = await Vendor.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      updateData,
       { new: true }
     );
     if (!vendor) {

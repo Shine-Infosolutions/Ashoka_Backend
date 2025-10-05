@@ -13,8 +13,10 @@ router.post("/add", vendorController.createVendor);
 
 // Update vendor
 router.put("/update/:id", vendorController.updateVendor);
+router.put("/:id", vendorController.updateVendor);
 
 // Delete vendor
 router.delete("/delete/:id", vendorController.deleteVendor);
+router.delete("/:id", vendorController.deleteVendor);
 
 module.exports = router;
