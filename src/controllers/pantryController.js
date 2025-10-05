@@ -143,8 +143,10 @@ exports.updatePantryOrderStatus = async (req, res) => {
     }
 
     await order.save();
-    await order.populate("orderedBy", "username email")
-               .populate("vendorId", "name phone email");
+    await order.populate([
+      { path: "orderedBy", select: "username email" },
+      { path: "vendorId", select: "name phone email" }
+    ]);
 
     res.json({ success: true, order });
   } catch (error) {
