@@ -27,7 +27,7 @@ const PantryOrderSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'preparing', 'ready', 'delivered', 'cancelled'],
+    enum: ['pending', 'approved', 'preparing', 'ready', 'delivered', 'fulfilled', 'cancelled'],
     default: 'pending'
   },
   orderType: {
