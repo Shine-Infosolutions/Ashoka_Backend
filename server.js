@@ -43,6 +43,7 @@ const attendanceRoutes = require("./src/routes/attendanceRoutes.js");
 const payrollRoutes = require("./src/routes/payrollRoutes.js");
 const staffRoutes = require("./src/routes/staffRoutes.js");
 const vendorRoutes = require("./src/routes/vendorRoutes.js");
+const roomInspectionRoutes = require("./src/routes/roomInspectionRoutes.js");
 const path = require("path");
 // Initialize express app
 const app = express();
@@ -50,6 +51,8 @@ const app = express();
 // Middleware
 const allowedOrigins = [
   "http://localhost:5173",
+  "http://localhost:3000",
+  "http://localhost:5000",
   "https://ashoka-backend.vercel.app",
   "https://ashokacrm.vercel.app",
 ];
@@ -135,6 +138,7 @@ app.use("/api/attendance", attendanceRoutes);
 app.use("/api/payroll", payrollRoutes);
 app.use("/api/staff", staffRoutes);
 app.use("/api/vendor", vendorRoutes);
+app.use("/api/room-inspections", roomInspectionRoutes);
 
 // Health check endpoint
 app.get("/health", (req, res) => {
