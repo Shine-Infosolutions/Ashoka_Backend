@@ -1,3 +1,4 @@
+// models/CashTransaction.js
 const mongoose = require('mongoose');
 
 const cashTransactionSchema = new mongoose.Schema({
@@ -7,13 +8,18 @@ const cashTransactionSchema = new mongoose.Schema({
   },
   type: { 
     type: String, 
-    enum: ['KEEP', 'SENT'], // IN = received at reception, OUT = sent to office
+    enum: ['KEEP', 'SENT'], // KEEP = received at reception, SENT = sent to office
     required: true 
+  },
+  source: {
+    type: String,
+    enum: ['RESTAURANT', 'ROOM_BOOKING', 'BANQUET', 'PARTY', 'OTHER'],
+    required: true,
   },
   description: { 
     type: String, 
     default: '' 
-  }, // Optional: "Guest Payment" / "Sent to Office"
+  },
   receptionistId: { 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'User' 
