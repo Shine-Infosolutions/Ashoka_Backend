@@ -11,15 +11,8 @@ const VendorSchema = new mongoose.Schema({
   phone: {
     type: String
   },
-  email: {
-    type: String
-  },
   address: {
     type: String
-  },
-  GSTin: {
-    type: String,
-    trim: true
   },
   UpiID: {
     type: String,
