@@ -16,7 +16,7 @@ const bookingSchema = new mongoose.Schema({
   ratePerPax: { type: Number }, // Rate per person
   paymentMethod: {
   type: String,
-  enum: ["cash", "online"],
+  enum: ["cash", "online", "card"],
   default: "cash"
 },
 transactionId: {
