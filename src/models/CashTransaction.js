@@ -13,7 +13,7 @@ const cashTransactionSchema = new mongoose.Schema({
   },
   source: {
     type: String,
-    enum: ['RESTAURANT', 'ROOM_BOOKING', 'BANQUET + PARTY', 'OTHER'],
+    enum: ['RESTAURANT', 'ROOM BOOKING', 'BANQUET + PARTY', 'OTHER'],
     required: true,
   },
   description: { 
