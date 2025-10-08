@@ -131,18 +131,20 @@ exports.updatePantryOrderStatus = async (req, res) => {
 
     order.status = status;
 
-    if (status === "delivered") {
+    // ✅ If status is delivered or fulfilled → update stock
+    if (["delivered", "fulfilled"].includes(status)) {
       order.deliveredAt = new Date();
 
-      // Update pantry item stock if delivered
+      // Update pantry item stock
       for (const item of order.items) {
         await PantryItem.findByIdAndUpdate(item.itemId, {
-          $inc: { currentStock: -item.quantity },
+          $inc: { stockQuantity: item.quantity }  // ✅ Add stock for fulfilled vendor delivery
         });
       }
     }
 
     await order.save();
+
     await order.populate([
       { path: "orderedBy", select: "username email" },
       { path: "vendorId", select: "name phone email" }
