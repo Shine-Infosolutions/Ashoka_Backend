@@ -6,7 +6,8 @@ const PantryItemSchema = new mongoose.Schema({
     required: true
   },
   category: {
-    type: String,
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'PantryCategory', // Reference to master category
     required: true
   },
   price: {
