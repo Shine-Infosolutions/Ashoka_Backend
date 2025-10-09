@@ -66,12 +66,12 @@ const getCashAtReception = async (req, res) => {
       const sourceMatch = { ...matchConditions, source };
 
       const totalIn = await CashTransaction.aggregate([
-        { $match: { ...sourceMatch, type: { $in: ['KEEP', 'OFFICE TO RECEPTION'] } } },
+        { $match: { ...sourceMatch, type: { $in: ['KEEP AT RECEPTION', 'OFFICE TO RECEPTION'] } } },
         { $group: { _id: "$source", total: { $sum: "$amount" } } }
       ]);
 
       const totalOut = await CashTransaction.aggregate([
-        { $match: { ...sourceMatch, type: 'SENT' } },
+        { $match: { ...sourceMatch, type: 'SENT TO OFFICE' } },
         { $group: { _id: "$source", total: { $sum: "$amount" } } }
       ]);
 
@@ -111,8 +111,8 @@ const addCashTransaction = async (req, res) => {
     if (!amount || isNaN(amount) || amount <= 0) {
       return res.status(400).json({ message: 'Amount must be a positive number' });
     }
-    if (!['KEEP', 'SENT', 'OFFICE TO RECEPTION'].includes(type)) {
-      return res.status(400).json({ message: 'Type must be KEEP, SENT, or OFFICE TO RECEPTION' });
+    if (!['KEEP AT RECEPTION', 'SENT TO OFFICE', 'OFFICE TO RECEPTION'].includes(type)) {
+      return res.status(400).json({ message: 'Type must be KEEP AT RECEPTION, SENT TO OFFICE, or OFFICE TO RECEPTION' });
     }
 
     const validSources = ['RESTAURANT', 'ROOM_BOOKING', 'BANQUET + PARTY', 'OTHER'];
