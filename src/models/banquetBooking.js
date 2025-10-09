@@ -10,7 +10,18 @@ const bookingSchema = new mongoose.Schema({
  gst:{type:Number},
 
   ratePlan: { type: String, },
-  advance: { type: Number, default: 0 },
+  advance: [
+    {
+      amount: { type: Number, required: true, min: 0 },
+      date: { type: Date, default: Date.now },
+      method: { 
+        type: String, 
+        enum: ["cash", "card", "upi", "wallet", "other"], 
+        default: "cash" 
+      },
+      remarks: String
+    }
+  ],  
   total: { type: Number, },
   balance: { type: Number },
   ratePerPax: { type: Number }, // Rate per person
