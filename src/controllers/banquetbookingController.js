@@ -19,29 +19,38 @@ exports.createBooking = async (req, res) => {
       refExists = await Menu.exists({ customerRef });
     }
 
-    // Convert string numbers to actual numbers
     const bookingData = { ...req.body };
-    if (bookingData.pax) bookingData.pax = Number(bookingData.pax);
-    if (bookingData.advance) bookingData.advance = Number(bookingData.advance);
-    if (bookingData.total) bookingData.total = Number(bookingData.total);
-    if (bookingData.balance) bookingData.balance = Number(bookingData.balance);
-    if (bookingData.ratePerPax) bookingData.ratePerPax = Number(bookingData.ratePerPax);
-    if (bookingData.discount) bookingData.discount = Number(bookingData.discount);
-    if (bookingData.gst) bookingData.gst = Number(bookingData.gst);
-    if (bookingData.extraRooms) bookingData.extraRooms = Number(bookingData.extraRooms);
-    if (bookingData.roomPricePerUnit) bookingData.roomPricePerUnit = Number(bookingData.roomPricePerUnit);
-    if (bookingData.extraRoomTotalPrice) bookingData.extraRoomTotalPrice = Number(bookingData.extraRoomTotalPrice);
-    if (bookingData.complimentaryRooms) bookingData.complimentaryRooms = Number(bookingData.complimentaryRooms);
-    if (bookingData.staffEditCount) bookingData.staffEditCount = Number(bookingData.staffEditCount);
+
+    // Convert numeric fields safely
+    const numericFields = [
+      'pax', 'total', 'balance', 'ratePerPax', 'discount', 'gst',
+      'extraRooms', 'roomPricePerUnit', 'extraRoomTotalPrice',
+      'complimentaryRooms', 'staffEditCount'
+    ];
+    numericFields.forEach(f => {
+      if (bookingData[f]) bookingData[f] = Number(bookingData[f]);
+    });
+
+    // ✅ Handle advance array properly
+    if (Array.isArray(bookingData.advance)) {
+      bookingData.advance = bookingData.advance.map(a => ({
+        amount: Number(a.amount) || 0,
+        date: a.date ? new Date(a.date) : new Date(),
+        method: a.method || "cash",
+        remarks: a.remarks || "",
+      }));
+    } else {
+      bookingData.advance = [];
+    }
 
     // Attach customerRef
     bookingData.customerRef = customerRef;
 
-    // 1. Create booking
+    // Create booking
     const booking = await BanquetBooking.create(bookingData);
     console.log("Booking created:", booking);
-console.log("Menu",req.body.categorizedMenu)
-    // 2. Handle categorizedMenu
+
+    // Handle categorizedMenu
     if (req.body.categorizedMenu) {
       const menu = new Menu({
         categories: req.body.categorizedMenu,
@@ -49,7 +58,7 @@ console.log("Menu",req.body.categorizedMenu)
         customerRef: customerRef
       });
       await menu.save();
-      console.log('Menu created with bookingRef:', booking._id);
+      console.log("Menu created with bookingRef:", booking._id);
     }
 
     res.status(201).json({ message: "Success", booking });
@@ -57,14 +66,11 @@ console.log("Menu",req.body.categorizedMenu)
     console.error("Full error:", {
       message: err.message,
       stack: err.stack,
-      receivedData: {
-        body: req.body,
-        categorizedMenu: req.body.categorizedMenu
-      }
+      receivedData: req.body
     });
-    res.status(500).json({ 
+    res.status(500).json({
       message: "Error creating booking",
-      error: err.message
+      error: err.message,
     });
   }
 };
@@ -152,24 +158,36 @@ exports.getBookingById = async (req, res) => {
 
 exports.updateBooking = async (req, res) => {
   try {
-    const updatedData = req.body;
+    const updatedData = { ...req.body };
 
-    // Auto-recalculate balance if advance or total changed
-    if (
-      updatedData.total &&
-      updatedData.advance &&
-      (updatedData.balance === undefined || updatedData.balance === "")
-    ) {
-      updatedData.balance = updatedData.total - updatedData.advance;
-    }
-
-    // 1. Find the booking
+    // 1️⃣ Find existing booking
     const booking = await BanquetBooking.findById(req.params.id);
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
     }
 
-    // 2. Append to statusHistory if new entries are present
+    // 2️⃣ Handle advance array (append new payments if any)
+    if (Array.isArray(updatedData.advance) && updatedData.advance.length > 0) {
+      // Normalize all advances
+      const newAdvances = updatedData.advance.map(a => ({
+        amount: Number(a.amount) || 0,
+        date: a.date ? new Date(a.date) : new Date(),
+        method: a.method || "cash",
+        remarks: a.remarks || "",
+      }));
+
+      // Append new ones to existing
+      booking.advance = [...(booking.advance || []), ...newAdvances];
+    }
+
+    // 3️⃣ Recalculate totalAdvance + balance automatically
+    const totalAdvance = (booking.advance || []).reduce((sum, a) => sum + (a.amount || 0), 0);
+    if (updatedData.total) {
+      booking.total = Number(updatedData.total);
+    }
+    booking.balance = (booking.total || 0) - totalAdvance;
+
+    // 4️⃣ Append to statusHistory if new entries are present
     if (Array.isArray(updatedData.statusHistory) && updatedData.statusHistory.length > 0) {
       updatedData.statusHistory.forEach(newEntry => {
         const exists = booking.statusHistory.some(
@@ -181,16 +199,19 @@ exports.updateBooking = async (req, res) => {
           booking.statusHistory.push(newEntry);
         }
       });
-      // Remove statusHistory from updatedData so it doesn't overwrite
       delete updatedData.statusHistory;
     }
 
-    // 3. Update other fields
-    Object.assign(booking, updatedData);
+    // 5️⃣ Assign other fields (except advance & total which we handled above)
+    const ignoredFields = ["advance", "total"];
+    Object.keys(updatedData).forEach(key => {
+      if (!ignoredFields.includes(key)) {
+        booking[key] = updatedData[key];
+      }
+    });
 
-    // --- STAFF MENU EDIT LIMIT LOGIC ---
+    // 6️⃣ STAFF MENU EDIT LIMIT LOGIC
     const role = (req.body.role || req.body.rolr || "staff").toLowerCase();
-    // Only enforce staffEditCount if menu is being changed
     if (role !== "admin" && req.body.categorizedMenu) {
       if (typeof booking.staffEditCount !== "number") booking.staffEditCount = 0;
       if (booking.staffEditCount >= 2) {
@@ -199,11 +220,10 @@ exports.updateBooking = async (req, res) => {
       booking.staffEditCount += 1;
     }
 
-
-    // 4. Save the booking
+    // 7️⃣ Save the booking
     await booking.save();
 
-    // --- MENU UPDATE LOGIC ---
+    // 8️⃣ MENU UPDATE LOGIC
     if (updatedData.categorizedMenu && booking.customerRef) {
       let menu = await Menu.findOne({ bookingRef: booking._id });
       if (menu) {
@@ -220,10 +240,12 @@ exports.updateBooking = async (req, res) => {
       }
     }
 
+    // ✅ Response
     res.status(200).json({
       message: "Booking and Menu updated successfully",
       booking,
     });
+
   } catch (err) {
     console.error("Error updating booking:", err.message);
     res.status(500).json({
