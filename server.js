@@ -44,6 +44,7 @@ const payrollRoutes = require("./src/routes/payrollRoutes.js");
 const staffRoutes = require("./src/routes/staffRoutes.js");
 const vendorRoutes = require("./src/routes/vendorRoutes.js");
 const roomInspectionRoutes = require("./src/routes/roomInspectionRoutes.js");
+const pantryCategoryRoutes = require("./src/routes/pantryCategoryRoutes.js");
 const path = require("path");
 // Initialize express app
 const app = express();
@@ -139,6 +140,7 @@ app.use("/api/payroll", payrollRoutes);
 app.use("/api/staff", staffRoutes);
 app.use("/api/vendor", vendorRoutes);
 app.use("/api/room-inspections", roomInspectionRoutes);
+app.use("/api/pantry-categories", pantryCategoryRoutes);
 
 // Health check endpoint
 app.get("/health", (req, res) => {
