@@ -8,7 +8,7 @@ const cashTransactionSchema = new mongoose.Schema({
   },
   type: { 
     type: String, 
-    enum: ['KEEP', 'SENT'], // KEEP = received at reception, SENT = sent to office
+    enum: ['KEEP', 'SENT', 'OFFICE TO RECEPTION'], // KEEP = received at reception, SENT = sent to office
     required: true 
   },
   source: {

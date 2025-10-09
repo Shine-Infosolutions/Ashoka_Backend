@@ -1,46 +1,57 @@
 const CashTransaction = require('../models/CashTransaction');
 const mongoose = require('mongoose');
 
-// 💰 Get cash summary + optional filters (date, week, month, year, today, source) + pagination
+// 💰 Get cash summary + optional filters (date, week, month, year, today, source, custom range) + pagination
 const getCashAtReception = async (req, res) => {
   try {
-    const { filter, page = 1, limit = 10 } = req.query;
+    const { filter, page = 1, limit = 10, startDate: startQuery, endDate: endQuery } = req.query;
     const matchConditions = {};
 
-    // --- Apply date filters as before ---
+    // --- Apply date filters ---
     const now = new Date();
     let startDate, endDate;
 
-    switch (filter) {
-      case 'today':
-        startDate = new Date(now.setHours(0, 0, 0, 0));
-        endDate = new Date(now.setHours(23, 59, 59, 999));
-        break;
-      case 'week': {
-        const curr = new Date();
-        const first = curr.getDate() - curr.getDay();
-        startDate = new Date(curr.setDate(first));
-        startDate.setHours(0, 0, 0, 0);
-        endDate = new Date();
-        endDate.setHours(23, 59, 59, 999);
-        break;
+    if (startQuery && endQuery) {
+      // Custom date range
+      const startD = new Date(startQuery);
+      const endD = new Date(endQuery);
+      if (isNaN(startD.getTime()) || isNaN(endD.getTime())) {
+        return res.status(400).json({ message: 'Invalid startDate or endDate format' });
       }
-      case 'month':
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-        break;
-      case 'year':
-        startDate = new Date(now.getFullYear(), 0, 1);
-        endDate = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
-        break;
-      case 'date':
-        if (req.query.date) {
-          const d = new Date(req.query.date);
-          if (isNaN(d.getTime())) return res.status(400).json({ message: 'Invalid date format' });
-          startDate = new Date(d.setHours(0, 0, 0, 0));
-          endDate = new Date(d.setHours(23, 59, 59, 999));
+      startDate = new Date(startD.setHours(0, 0, 0, 0));
+      endDate = new Date(endD.setHours(23, 59, 59, 999));
+    } else {
+      switch (filter) {
+        case 'today':
+          startDate = new Date(now.setHours(0, 0, 0, 0));
+          endDate = new Date(now.setHours(23, 59, 59, 999));
+          break;
+        case 'week': {
+          const curr = new Date();
+          const first = curr.getDate() - curr.getDay();
+          startDate = new Date(curr.setDate(first));
+          startDate.setHours(0, 0, 0, 0);
+          endDate = new Date();
+          endDate.setHours(23, 59, 59, 999);
+          break;
         }
-        break;
+        case 'month':
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+          break;
+        case 'year':
+          startDate = new Date(now.getFullYear(), 0, 1);
+          endDate = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+          break;
+        case 'date':
+          if (req.query.date) {
+            const d = new Date(req.query.date);
+            if (isNaN(d.getTime())) return res.status(400).json({ message: 'Invalid date format' });
+            startDate = new Date(d.setHours(0, 0, 0, 0));
+            endDate = new Date(d.setHours(23, 59, 59, 999));
+          }
+          break;
+      }
     }
 
     if (startDate && endDate) {
@@ -55,7 +66,7 @@ const getCashAtReception = async (req, res) => {
       const sourceMatch = { ...matchConditions, source };
 
       const totalIn = await CashTransaction.aggregate([
-        { $match: { ...sourceMatch, type: 'KEEP' } },
+        { $match: { ...sourceMatch, type: { $in: ['KEEP', 'OFFICE TO RECEPTION'] } } },
         { $group: { _id: "$source", total: { $sum: "$amount" } } }
       ]);
 
@@ -85,13 +96,12 @@ const getCashAtReception = async (req, res) => {
       };
     }
 
-    res.json({ filterApplied: filter || 'all', cards });
+    res.json({ filterApplied: filter || (startQuery && endQuery ? 'custom-range' : 'all'), cards });
   } catch (err) {
     console.error('Error fetching cash report:', err);
     res.status(500).json({ message: 'Server error while fetching cash report' });
   }
 };
-
 
 // ➕ Add new cash transaction with validation
 const addCashTransaction = async (req, res) => {
@@ -101,9 +111,10 @@ const addCashTransaction = async (req, res) => {
     if (!amount || isNaN(amount) || amount <= 0) {
       return res.status(400).json({ message: 'Amount must be a positive number' });
     }
-    if (!['KEEP', 'SENT'].includes(type)) {
-      return res.status(400).json({ message: 'Type must be either KEEP or SENT' });
+    if (!['KEEP', 'SENT', 'OFFICE TO RECEPTION'].includes(type)) {
+      return res.status(400).json({ message: 'Type must be KEEP, SENT, or OFFICE TO RECEPTION' });
     }
+
     const validSources = ['RESTAURANT', 'ROOM_BOOKING', 'BANQUET + PARTY', 'OTHER'];
     if (!source || !validSources.includes(source.toUpperCase())) {
       return res.status(400).json({ message: `Source is required. Valid sources: ${validSources.join(', ')}` });
@@ -143,7 +154,8 @@ const getAllCashTransactions = async (req, res) => {
       transactions,
     });
   } catch (err) {
-    res.status(500).json({ message: 'Error fetching all transactions' });
+    console.error('Error fetching all transactions:', err);
+    res.status(500).json({ message: 'Server error while fetching transactions' });
   }
 };
 
