@@ -1,16 +1,21 @@
 const PantryItem = require("../models/PantryItem");
 const PantryOrder = require("../models/PantryOrder");
 
-// Get all pantry items
+// Get all pantry items with category details
 exports.getAllPantryItems = async (req, res) => {
   try {
-    const items = await PantryItem.find().sort({ name: 1 });
-    // Ensure isLowStock is calculated correctly with fixed threshold of 20
-    const updatedItems = items.map(item => {
-      item.isLowStock = item.currentStock <= 20;
+    let items = await PantryItem.find()
+      .populate("category", "name description") // populate category fields
+      .sort({ name: 1 });
+
+    // Calculate isLowStock
+    items = items.map(item => {
+      item = item.toObject(); // convert Mongoose doc to plain object
+      item.isLowStock = item.stockQuantity <= 20;
       return item;
     });
-    res.json({ success: true, items: updatedItems });
+
+    res.json({ success: true, items });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -19,33 +24,37 @@ exports.getAllPantryItems = async (req, res) => {
 // Get low stock pantry items
 exports.getLowStockPantryItems = async (req, res) => {
   try {
-    const items = await PantryItem.find({ isLowStock: true }).sort({ name: 1 });
+    const items = await PantryItem.find({ stockQuantity: { $lte: 20 } })
+      .populate("category", "name description")
+      .sort({ name: 1 });
+
     res.json({ success: true, items });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-// Create pantry item
+// Create pantry item with category details
 exports.createPantryItem = async (req, res) => {
   try {
     const item = new PantryItem(req.body);
     await item.save();
-    res.status(201).json({ success: true, item });
+    const populatedItem = await item.populate("category", "name description");
+    res.status(201).json({ success: true, item: populatedItem });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 };
 
-// Update pantry item
+// Update pantry item with category details
 exports.updatePantryItem = async (req, res) => {
   try {
-    const item = await PantryItem.findByIdAndUpdate(req.params.id, req.body, {
+    let item = await PantryItem.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
     });
-    if (!item) {
-      return res.status(404).json({ error: "Pantry item not found" });
-    }
+    if (!item) return res.status(404).json({ error: "Pantry item not found" });
+
+    item = await item.populate("category", "name description");
     res.json({ success: true, item });
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -56,14 +65,14 @@ exports.updatePantryItem = async (req, res) => {
 exports.deletePantryItem = async (req, res) => {
   try {
     const item = await PantryItem.findByIdAndDelete(req.params.id);
-    if (!item) {
-      return res.status(404).json({ error: "Pantry item not found" });
-    }
+    if (!item) return res.status(404).json({ error: "Pantry item not found" });
+
     res.json({ success: true, message: "Pantry item deleted" });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
+
 
 // Create pantry order (kitchen to pantry or pantry to reception)
 exports.createPantryOrder = async (req, res) => {
