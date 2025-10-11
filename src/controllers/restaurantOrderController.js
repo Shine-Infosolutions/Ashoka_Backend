@@ -16,60 +16,73 @@ const generateKOTNumber = async () => {
   return `KOT${dateStr}${String(count + 1).padStart(3, "0")}`;
 };
 
-//createOrder
 exports.createOrder = async (req, res) => {
   try {
-    const { bookingId } = req.body;
+    const { bookingId, items } = req.body;
 
     // ✅ Validate order type
     if (!bookingId) {
       if (!req.body.staffName || !req.body.phoneNumber || !req.body.tableNo) {
         return res.status(400).json({
-          error: "For non-booking orders, staffName, phoneNumber, and tableNo are required"
+          error: "For non-booking orders, staffName, phoneNumber, and tableNo are required",
         });
       }
     }
 
+    // ✅ Fetch item details (attach name and price)
+    const populatedItems = await Promise.all(
+      items.map(async (item) => {
+        const itemDetails = await Item.findById(item.itemId);
+        return {
+          itemId: item.itemId,
+          itemName: itemDetails?.name || "Unknown Item",
+          quantity: item.quantity,
+          price: itemDetails?.Price || 0,
+        };
+      })
+    );
+
     // ✅ Save Order
-    const orderData = { ...req.body, createdBy: req.user?.id };
+    const orderData = {
+      ...req.body,
+      items: populatedItems, // with names & price
+      createdBy: req.user?.id,
+    };
+
     const order = new RestaurantOrder(orderData);
     await order.save();
 
     // ✅ Auto-create KOT
     const kotNumber = await generateKOTNumber();
 
-    // Items ke details fetch karna (name, rate/price)
-    const kotItems = await Promise.all(
-      order.items.map(async (item) => {
-        const itemDetails = await Item.findById(item.itemId);
-        return {
-          itemId: item.itemId,
-          itemName: itemDetails?.name || "Unknown Item",
-          quantity: item.quantity,
-          rate: itemDetails?.Price || 0,
-          amount: (itemDetails?.Price || 0) * item.quantity,
-        };
-      })
-    );
+    const kotItems = populatedItems.map((item) => ({
+      itemId: item.itemId,
+      itemName: item.itemName,
+      quantity: item.quantity,
+      rate: item.price,
+      amount: item.price * item.quantity,
+    }));
 
     const kot = new KOT({
       orderId: order._id,
       kotNumber,
-      tableNo: order.tableNo || "Inhouse Booking", // agar table no nhi hai to fallback
+      tableNo: order.tableNo || "Inhouse Booking",
       items: kotItems,
-      createdBy: req.user?.id
+      createdBy: req.user?.id,
     });
+
     await kot.save();
 
     res.status(201).json({
       success: true,
       order,
-      kot
+      kot,
     });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 };
+
 
 // Get all restaurant orders
 exports.getAllOrders = async (req, res) => {

@@ -28,6 +28,7 @@ const RestaurantOrderSchema = new mongoose.Schema({
       ref: 'Item',
       required: true
     },
+    itemName: { type: String }, 
     quantity: { type: Number, required: true },
     price: { type: Number, required: true }
   }],
