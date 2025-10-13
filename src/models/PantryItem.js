@@ -45,6 +45,7 @@ const PantryItemSchema = new mongoose.Schema({
       'packet',
       'combo',
       'slice',
+      'tin',
       'scoop',
       'portion'
     ],
