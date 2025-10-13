@@ -49,7 +49,11 @@ complimentaryRooms: {
   type: Number,
   default: 2 // or whatever your default is
 },
-
+mealPlan: {
+  type: String,
+  enum: ['With Breakfast', 'Without Breakfast'],
+  default: 'Without Breakfast'
+},
   time:{type: String, trim: true}, // Time of the bookin
 foodType: {
   type: String,
