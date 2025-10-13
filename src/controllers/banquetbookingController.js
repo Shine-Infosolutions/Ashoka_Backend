@@ -155,7 +155,6 @@ exports.getBookingById = async (req, res) => {
 //   }
 // };
 
-
 exports.updateBooking = async (req, res) => {
   try {
     const updatedData = { ...req.body };
@@ -166,28 +165,23 @@ exports.updateBooking = async (req, res) => {
       return res.status(404).json({ message: "Booking not found" });
     }
 
-    // 2️⃣ Handle advance array (append new payments if any)
+    // 2️⃣ Handle advance array
     if (Array.isArray(updatedData.advance) && updatedData.advance.length > 0) {
-      // Normalize all advances
       const newAdvances = updatedData.advance.map(a => ({
         amount: Number(a.amount) || 0,
         date: a.date ? new Date(a.date) : new Date(),
         method: a.method || "cash",
         remarks: a.remarks || "",
       }));
-
-      // Append new ones to existing
       booking.advance = [...(booking.advance || []), ...newAdvances];
     }
 
-    // 3️⃣ Recalculate totalAdvance + balance automatically
+    // 3️⃣ Recalculate totalAdvance + balance
     const totalAdvance = (booking.advance || []).reduce((sum, a) => sum + (a.amount || 0), 0);
-    if (updatedData.total) {
-      booking.total = Number(updatedData.total);
-    }
+    if (updatedData.total) booking.total = Number(updatedData.total);
     booking.balance = (booking.total || 0) - totalAdvance;
 
-    // 4️⃣ Append to statusHistory if new entries are present
+    // 4️⃣ Append to statusHistory
     if (Array.isArray(updatedData.statusHistory) && updatedData.statusHistory.length > 0) {
       updatedData.statusHistory.forEach(newEntry => {
         const exists = booking.statusHistory.some(
@@ -195,18 +189,24 @@ exports.updateBooking = async (req, res) => {
             entry.status === newEntry.status &&
             new Date(entry.changedAt).getTime() === new Date(newEntry.changedAt).getTime()
         );
-        if (!exists) {
-          booking.statusHistory.push(newEntry);
-        }
+        if (!exists) booking.statusHistory.push(newEntry);
       });
       delete updatedData.statusHistory;
     }
 
-    // 5️⃣ Assign other fields (except advance & total which we handled above)
+    // 5️⃣ Assign other fields including mealPlan
     const ignoredFields = ["advance", "total"];
     Object.keys(updatedData).forEach(key => {
       if (!ignoredFields.includes(key)) {
-        booking[key] = updatedData[key];
+        // ✅ Special handling for mealPlan to validate enum
+        if (key === "mealPlan") {
+          const validOptions = ["With Breakfast", "Without Breakfast"];
+          booking.mealPlan = validOptions.includes(updatedData.mealPlan)
+            ? updatedData.mealPlan
+            : "Without Breakfast"; // default
+        } else {
+          booking[key] = updatedData[key];
+        }
       }
     });
 
@@ -254,6 +254,7 @@ exports.updateBooking = async (req, res) => {
     });
   }
 };
+
 
 // @desc    Delete a booking by ID
 exports.deleteBooking = async (req, res) => {
