@@ -1,6 +1,8 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const { createServer } = require("http");
+const { Server } = require("socket.io");
 require("dotenv").config();
 
 const authRoutes = require("./src/routes/auth.js");
@@ -48,6 +50,20 @@ const pantryCategoryRoutes = require("./src/routes/pantryCategoryRoutes.js");
 const path = require("path");
 // Initialize express app
 const app = express();
+const server = createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: [
+      "http://localhost:5173",
+      "http://localhost:3000",
+      "https://ashokacrm.vercel.app"
+    ],
+    methods: ["GET", "POST"]
+  }
+});
+
+// Make io available globally
+app.set('io', io);
 
 // Middleware
 const allowedOrigins = [
@@ -160,10 +176,24 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: "Server error", message: err.message });
 });
 
+// Socket.io connection handling
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.id);
+  
+  socket.on('join-waiter-dashboard', () => {
+    socket.join('waiters');
+    console.log('User joined waiter dashboard');
+  });
+  
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
+  });
+});
+
 // For local development
 if (process.env.NODE_ENV !== "production") {
   const PORT = process.env.PORT || 5000;
-  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+  server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 }
 
 // Export for serverless

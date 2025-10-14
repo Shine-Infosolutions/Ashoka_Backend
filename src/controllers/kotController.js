@@ -48,6 +48,17 @@ exports.createKOT = async (req, res) => {
     });
     
     await kot.save();
+    
+    // 🔥 WebSocket: Emit new KOT event
+    const io = req.app.get('io');
+    if (io) {
+      io.to('waiters').emit('new-kot', {
+        kot,
+        tableNo: order.tableNo,
+        itemCount: kotItems.length
+      });
+    }
+    
     res.status(201).json(kot);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -84,6 +95,17 @@ exports.updateKOTStatus = async (req, res) => {
     
     const kot = await KOT.findByIdAndUpdate(req.params.id, updates, { new: true });
     if (!kot) return res.status(404).json({ error: 'KOT not found' });
+    
+    // 🔥 WebSocket: Emit KOT status update
+    const io = req.app.get('io');
+    if (io) {
+      io.to('waiters').emit('kot-status-updated', {
+        kotId: kot._id,
+        orderId: kot.orderId,
+        status: kot.status,
+        tableNo: kot.tableNo
+      });
+    }
     
     // Send notification when order is marked as served
     if (status === 'served') {

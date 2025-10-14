@@ -2,6 +2,7 @@ const RestaurantOrder = require("../models/RestaurantOrder");
 const Item = require("../models/Items");
 const KOT = require("../models/KOT");
 const Bill = require("../models/Bill");
+const Table = require("../models/Table");
 
 // Generate KOT number
 const generateKOTNumber = async () => {
@@ -72,6 +73,35 @@ exports.createOrder = async (req, res) => {
     });
 
     await kot.save();
+
+    // 🔥 WebSocket: Emit new order event
+    const io = req.app.get('io');
+    if (io) {
+      io.to('waiters').emit('new-order', {
+        order,
+        kot,
+        tableNo: order.tableNo,
+        itemCount: kotItems.length
+      });
+    }
+
+    // Update table status to occupied
+    try {
+      const table = await Table.findOneAndUpdate(
+        { tableNumber: order.tableNo },
+        { status: 'occupied' },
+        { new: true }
+      );
+      if (table && io) {
+        io.to('waiters').emit('table-status-updated', {
+          tableId: table._id,
+          tableNumber: table.tableNumber,
+          status: 'occupied'
+        });
+      }
+    } catch (tableError) {
+      console.error('Error updating table status:', tableError);
+    }
 
     res.status(201).json({
       success: true,
@@ -245,6 +275,37 @@ exports.updateOrderStatus = async (req, res) => {
       { new: true }
     );
     if (!order) return res.status(404).json({ error: "Order not found" });
+    
+    // 🔥 WebSocket: Emit order status update
+    const io = req.app.get('io');
+    if (io) {
+      io.to('waiters').emit('order-status-updated', {
+        orderId: order._id,
+        status: order.status,
+        tableNo: order.tableNo
+      });
+    }
+
+    // Update table status when order is completed/paid
+    if (status === 'completed' || status === 'paid') {
+      try {
+        const table = await Table.findOneAndUpdate(
+          { tableNumber: order.tableNo },
+          { status: 'available' },
+          { new: true }
+        );
+        if (table && io) {
+          io.to('waiters').emit('table-status-updated', {
+            tableId: table._id,
+            tableNumber: table.tableNumber,
+            status: 'available'
+          });
+        }
+      } catch (tableError) {
+        console.error('Error updating table status:', tableError);
+      }
+    }
+    
     res.json(order);
   } catch (error) {
     res.status(400).json({ error: error.message });

@@ -23,6 +23,15 @@ exports.createTable = async (req, res) => {
   try {
     const table = new Table(req.body);
     await table.save();
+    
+    // 🔥 WebSocket: Emit new table created
+    const io = req.app.get('io');
+    if (io) {
+      io.to('waiters').emit('table-created', {
+        table
+      });
+    }
+    
     res.status(201).json({ success: true, table });
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -37,6 +46,14 @@ exports.updateTable = async (req, res) => {
     
     if (!table) {
       return res.status(404).json({ error: 'Table not found' });
+    }
+    
+    // 🔥 WebSocket: Emit table updated
+    const io = req.app.get('io');
+    if (io) {
+      io.to('waiters').emit('table-updated', {
+        table
+      });
     }
     
     res.json({ success: true, table });
@@ -59,6 +76,16 @@ exports.updateTableStatus = async (req, res) => {
     
     if (!table) {
       return res.status(404).json({ error: 'Table not found' });
+    }
+    
+    // 🔥 WebSocket: Emit table status update
+    const io = req.app.get('io');
+    if (io) {
+      io.to('waiters').emit('table-status-updated', {
+        tableId: table._id,
+        tableNumber: table.tableNumber,
+        status: table.status
+      });
     }
     
     res.json({ success: true, table });
