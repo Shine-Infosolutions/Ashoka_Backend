@@ -184,6 +184,13 @@ io.on('connection', (socket) => {
     socket.join('waiters');
     console.log('User joined waiter dashboard');
   });
+
+  // Handle Banquet WebSocket events through Socket.io
+  socket.on('banquet-message', (data) => {
+    console.log('Banquet message received:', data);
+    // Broadcast to all clients
+    io.emit('banquet-update', data);
+  });
   
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
