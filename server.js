@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const { createServer } = require("http");
 const { Server } = require("socket.io");
+const WebSocket = require('ws');
 require("dotenv").config();
 
 const authRoutes = require("./src/routes/auth.js");
@@ -176,25 +177,47 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: "Server error", message: err.message });
 });
 
-// Socket.io connection handling
+// Socket.io connection handling (for existing features)
 io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
-  
   socket.on('join-waiter-dashboard', () => {
     socket.join('waiters');
-    console.log('User joined waiter dashboard');
   });
+});
 
-  // Handle Banquet WebSocket events through Socket.io
-  socket.on('banquet-message', (data) => {
-    console.log('Banquet message received:', data);
-    // Broadcast to all clients
-    io.emit('banquet-update', data);
+// WebSocket server for Banquet
+const wss = new WebSocket.Server({ 
+  server,
+  path: '/banquet-ws'
+});
+
+wss.on('connection', (ws) => {
+  console.log('WebSocket connected');
+  
+  ws.on('message', (message) => {
+    try {
+      const data = JSON.parse(message);
+      console.log('WebSocket message:', data.type);
+      
+      // Broadcast to all WebSocket clients
+      wss.clients.forEach((client) => {
+        if (client !== ws && client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify(data));
+        }
+      });
+    } catch (error) {
+      console.error('WebSocket message error:', error);
+    }
   });
   
-  socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
+  ws.on('close', () => {
+    console.log('WebSocket disconnected');
   });
+  
+  // Send welcome message
+  ws.send(JSON.stringify({
+    type: 'CONNECTION_ESTABLISHED',
+    message: 'Connected to Banquet WebSocket'
+  }));
 });
 
 // For local development
