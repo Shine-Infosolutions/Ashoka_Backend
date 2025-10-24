@@ -83,4 +83,10 @@ router.get(
   pantryController.generatePantryOrdersExcel
 );
 
+router.get(
+  "/items/excel-report",
+  authMiddleware(["admin", "staff"], ["pantry", "reception"]),
+  pantryController.generatePantryItemsExcel
+);
+
 module.exports = router;
