@@ -344,7 +344,7 @@ exports.generatePantryOrdersExcel = async (req, res) => {
 
     worksheet.columns = [
       { header: 'Order ID', key: 'orderId', width: 15 },
-      { header: 'Order Type', key: 'orderType', width: 20 },
+      { header: 'Order Type', key: 'orderType', width: 25 },
       { header: 'Status', key: 'status', width: 15 },
       { header: 'Total Amount', key: 'totalAmount', width: 15 },
       { header: 'Ordered By', key: 'orderedBy', width: 20 },

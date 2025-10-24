@@ -8,7 +8,7 @@ const PantryOrderSchema = new mongoose.Schema({
       required: true
     },
     quantity: {
-      type: Number,
+      type: String,
       required: true,
     },
     unitPrice: {
@@ -31,7 +31,7 @@ const PantryOrderSchema = new mongoose.Schema({
   },
   orderType: {
     type: String,
-    enum: ['Kitchen to Pantry', 'Pantry to Reception', 'Reception to Vendor'],
+    enum: ['Kitchen to Pantry', 'Pantry to Reception', 'Reception to Vendor', 'store to vendor', 'pantry to store'],
     default: 'room_service'
   },
   specialInstructions: {
