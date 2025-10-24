@@ -1,5 +1,6 @@
 const CashTransaction = require('../models/CashTransaction');
 const mongoose = require('mongoose');
+const ExcelJS = require('exceljs');
 
 // 💰 Get cash summary + optional filters (date, week, month, year, today, source, custom range) + pagination
 const getCashAtReception = async (req, res) => {
@@ -159,8 +160,63 @@ const getAllCashTransactions = async (req, res) => {
   }
 };
 
+// Generate Excel report for cash transactions with date range filter
+const generateCashTransactionsExcel = async (req, res) => {
+  try {
+    const { startDate, endDate, source, type } = req.query;
+    const filter = {};
+
+    if (startDate && endDate) {
+      filter.createdAt = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
+      };
+    }
+    if (source) filter.source = source;
+    if (type) filter.type = type;
+
+    const transactions = await CashTransaction.find(filter)
+      .populate('receptionistId', 'name email')
+      .sort({ createdAt: -1 });
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Cash Transactions');
+
+    worksheet.columns = [
+      { header: 'Transaction ID', key: 'transactionId', width: 20 },
+      { header: 'Amount', key: 'amount', width: 15 },
+      { header: 'Type', key: 'type', width: 25 },
+      { header: 'Source', key: 'source', width: 20 },
+      { header: 'Description', key: 'description', width: 30 },
+      { header: 'Receptionist', key: 'receptionist', width: 20 },
+      { header: 'Created At', key: 'createdAt', width: 20 }
+    ];
+
+    transactions.forEach(transaction => {
+      worksheet.addRow({
+        transactionId: transaction._id.toString(),
+        amount: transaction.amount,
+        type: transaction.type,
+        source: transaction.source,
+        description: transaction.description || '',
+        receptionist: transaction.receptionistId?.name || 'Unknown',
+        createdAt: transaction.createdAt.toLocaleDateString()
+      });
+    });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=cash-transactions-${Date.now()}.xlsx`);
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   getCashAtReception,
   addCashTransaction,
   getAllCashTransactions,
+  generateCashTransactionsExcel,
 };

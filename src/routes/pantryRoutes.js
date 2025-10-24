@@ -77,4 +77,10 @@ router.delete(
   pantryController.deletePantryOrder
 );
 
+router.get(
+  "/orders/excel-report",
+  authMiddleware(["admin", "staff"], ["pantry", "reception"]),
+  pantryController.generatePantryOrdersExcel
+);
+
 module.exports = router;

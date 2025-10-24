@@ -1,5 +1,6 @@
 const PantryItem = require("../models/PantryItem");
 const PantryOrder = require("../models/PantryOrder");
+const ExcelJS = require('exceljs');
 
 // Get all pantry items with category details
 exports.getAllPantryItems = async (req, res) => {
@@ -312,6 +313,72 @@ exports.generateVendorInvoice = async (req, res) => {
     }));
 
     res.json({ success: true, invoice });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Generate Excel report for pantry orders with date range filter
+exports.generatePantryOrdersExcel = async (req, res) => {
+  try {
+    const { startDate, endDate, orderType, status } = req.query;
+    const filter = {};
+
+    if (startDate && endDate) {
+      filter.createdAt = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
+      };
+    }
+    if (orderType) filter.orderType = orderType;
+    if (status) filter.status = status;
+
+    const orders = await PantryOrder.find(filter)
+      .populate('orderedBy', 'username email')
+      .populate('vendorId', 'name phone email')
+      .populate('items.itemId', 'name unit')
+      .sort({ createdAt: -1 });
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Pantry Orders');
+
+    worksheet.columns = [
+      { header: 'Order ID', key: 'orderId', width: 15 },
+      { header: 'Order Type', key: 'orderType', width: 20 },
+      { header: 'Status', key: 'status', width: 15 },
+      { header: 'Total Amount', key: 'totalAmount', width: 15 },
+      { header: 'Ordered By', key: 'orderedBy', width: 20 },
+      { header: 'Vendor', key: 'vendor', width: 20 },
+      { header: 'Items', key: 'items', width: 40 },
+      { header: 'Special Instructions', key: 'specialInstructions', width: 30 },
+      { header: 'Created At', key: 'createdAt', width: 20 },
+      { header: 'Delivered At', key: 'deliveredAt', width: 20 }
+    ];
+
+    orders.forEach(order => {
+      const itemsText = order.items.map(item => 
+        `${item.itemId?.name || 'Unknown'} (${item.quantity} ${item.itemId?.unit || ''})`
+      ).join(', ');
+
+      worksheet.addRow({
+        orderId: order._id.toString(),
+        orderType: order.orderType,
+        status: order.status,
+        totalAmount: order.totalAmount,
+        orderedBy: order.orderedBy?.username || 'Unknown',
+        vendor: order.vendorId?.name || 'N/A',
+        items: itemsText,
+        specialInstructions: order.specialInstructions || '',
+        createdAt: order.createdAt.toLocaleDateString(),
+        deliveredAt: order.deliveredAt ? order.deliveredAt.toLocaleDateString() : 'N/A'
+      });
+    });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=pantry-orders-${Date.now()}.xlsx`);
+
+    await workbook.xlsx.write(res);
+    res.end();
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
