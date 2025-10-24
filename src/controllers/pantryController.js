@@ -383,3 +383,61 @@ exports.generatePantryOrdersExcel = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// Generate Excel report for pantry items with date range filter
+exports.generatePantryItemsExcel = async (req, res) => {
+  try {
+    const { startDate, endDate, category, lowStock } = req.query;
+    const filter = {};
+
+    if (startDate && endDate) {
+      filter.createdAt = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
+      };
+    }
+    if (category) filter.category = category;
+    if (lowStock === 'true') filter.stockQuantity = { $lte: 20 };
+
+    const items = await PantryItem.find(filter)
+      .populate('category', 'name description')
+      .sort({ name: 1 });
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Pantry Items');
+
+    worksheet.columns = [
+      { header: 'Item ID', key: 'itemId', width: 15 },
+      { header: 'Name', key: 'name', width: 25 },
+      { header: 'Category', key: 'category', width: 20 },
+      { header: 'Stock Quantity', key: 'stockQuantity', width: 15 },
+      { header: 'Unit', key: 'unit', width: 10 },
+      { header: 'Cost Per Unit', key: 'costPerUnit', width: 15 },
+      { header: 'Low Stock', key: 'lowStock', width: 12 },
+      { header: 'Description', key: 'description', width: 30 },
+      { header: 'Created At', key: 'createdAt', width: 20 }
+    ];
+
+    items.forEach(item => {
+      worksheet.addRow({
+        itemId: item._id.toString(),
+        name: item.name,
+        category: item.category?.name || 'N/A',
+        stockQuantity: item.stockQuantity,
+        unit: item.unit,
+        costPerUnit: item.costPerUnit || 0,
+        lowStock: item.stockQuantity <= 20 ? 'Yes' : 'No',
+        description: item.description || '',
+        createdAt: item.createdAt ? item.createdAt.toLocaleDateString() : 'N/A'
+      });
+    });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=pantry-items-${Date.now()}.xlsx`);
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
