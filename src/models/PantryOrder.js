@@ -44,6 +44,7 @@ const PantryOrderSchema = new mongoose.Schema({
   deliveredAt: {
     type: Date
   },
+  chalanImage: String,
   fulfillment: {
     previousAmount: Number,
     newAmount: Number,

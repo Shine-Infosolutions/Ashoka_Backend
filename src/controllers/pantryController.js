@@ -193,7 +193,7 @@ exports.updatePantryStock = async (req, res) => {
 exports.generateLowStockInvoice = async (req, res) => {
   try {
     const lowStockItems = await PantryItem.find({ 
-      currentStock: { $lte: 20 }
+      stockQuantity: { $lte: 20 }
     }).sort({ name: 1 });
 
     if (lowStockItems.length === 0) {
@@ -203,22 +203,22 @@ exports.generateLowStockInvoice = async (req, res) => {
     const invoice = {
       invoiceNumber: `LSI-${Date.now()}`,
       generatedDate: new Date(),
-      generatedBy: req.user.id,
+      generatedBy: req.user?.id || 'system',
       title: "Low Stock Items Invoice",
       items: lowStockItems.map((item) => ({
         name: item.name,
         category: item.category,
-        currentStock: item.currentStock,
+        currentStock: item.stockQuantity,
         minStockLevel: 20,
         unit: item.unit,
-        shortfall: Math.max(0, 20 - item.currentStock),
+        shortfall: Math.max(0, 20 - item.stockQuantity),
         estimatedCost: item.costPerUnit || 0,
-        totalCost: Math.max(0, 20 - item.currentStock) * (item.costPerUnit || 0)
+        totalCost: Math.max(0, 20 - item.stockQuantity) * (item.costPerUnit || 0)
       })),
       totalItems: lowStockItems.length,
       totalEstimatedCost: lowStockItems.reduce(
         (sum, item) =>
-          sum + (Math.max(0, 20 - item.currentStock) * (item.costPerUnit || 0)),
+          sum + (Math.max(0, 20 - item.stockQuantity) * (item.costPerUnit || 0)),
         0
       )
     };
@@ -518,6 +518,47 @@ exports.generatePantryItemsExcel = async (req, res) => {
 
     await workbook.xlsx.write(res);
     res.end();
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Upload chalan from store
+exports.uploadChalan = async (req, res) => {
+  try {
+    const { orderId, image } = req.body;
+    
+    if (!image || !image.base64) {
+      return res.status(400).json({ error: 'Chalan image is required' });
+    }
+    
+    const fs = require('fs');
+    const path = require('path');
+    
+    const uploadsDir = path.join(__dirname, '../../uploads/chalans');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+    
+    const base64Data = image.base64.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64Data, 'base64');
+    
+    const timestamp = Date.now();
+    const filename = `chalan-${timestamp}-${image.name || 'chalan.jpg'}`;
+    const filepath = path.join(uploadsDir, filename);
+    
+    fs.writeFileSync(filepath, buffer);
+    
+    const chalanUrl = `/uploads/chalans/${filename}`;
+    
+    // Update order with chalan
+    if (orderId) {
+      await PantryOrder.findByIdAndUpdate(orderId, {
+        chalanImage: chalanUrl
+      });
+    }
+    
+    res.json({ success: true, chalanUrl });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
