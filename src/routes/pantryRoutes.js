@@ -77,6 +77,25 @@ router.delete(
   pantryController.deletePantryOrder
 );
 
+// Fulfillment Routes
+router.post(
+  "/upload-pricing-image",
+  authMiddleware(["admin", "staff"], ["pantry", "reception"]),
+  pantryController.uploadPricingImage
+);
+
+router.put(
+  "/fulfill-invoice/:orderId",
+  authMiddleware(["admin", "staff"], ["pantry", "reception"]),
+  pantryController.fulfillInvoice
+);
+
+router.get(
+  "/fulfillment-history/:orderId",
+  authMiddleware(["admin", "staff"], ["pantry", "reception"]),
+  pantryController.getFulfillmentHistory
+);
+
 router.get(
   "/orders/excel-report",
   authMiddleware(["admin", "staff"], ["pantry", "reception"]),

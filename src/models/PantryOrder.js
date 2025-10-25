@@ -43,6 +43,18 @@ const PantryOrderSchema = new mongoose.Schema({
   },
   deliveredAt: {
     type: Date
+  },
+  fulfillment: {
+    previousAmount: Number,
+    newAmount: Number,
+    difference: Number,
+    pricingImage: String,
+    fulfilledAt: Date,
+    fulfilledBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    notes: String
   }
 }, { timestamps: true });
 

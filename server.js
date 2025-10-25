@@ -57,7 +57,8 @@ const io = new Server(server, {
     origin: [
       "http://localhost:5173",
       "http://localhost:3000",
-      "https://ashokacrm.vercel.app"
+      "https://ashokacrm.vercel.app",
+      "https://zomato-frontend-mocha.vercel.app"
     ],
     methods: ["GET", "POST"]
   }

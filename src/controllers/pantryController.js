@@ -74,7 +74,6 @@ exports.deletePantryItem = async (req, res) => {
   }
 };
 
-
 // Create pantry order (kitchen to pantry or pantry to reception)
 exports.createPantryOrder = async (req, res) => {
   try {
@@ -166,6 +165,7 @@ exports.updatePantryOrderStatus = async (req, res) => {
   }
 };
 
+
 // Update pantry item stock
 exports.updatePantryStock = async (req, res) => {
   try {
@@ -190,40 +190,6 @@ exports.updatePantryStock = async (req, res) => {
 };
 
 // Generate invoice for low stock items
-// exports.generateLowStockInvoice = async (req, res) => {
-//   try {
-//     const lowStockItems = await PantryItem.find({ isLowStock: true }).sort({ name: 1 });
-
-//     if (lowStockItems.length === 0) {
-//       return res.status(404).json({ error: 'No low stock items found' });
-//     }
-
-//     const invoice = {
-//       invoiceNumber: `LSI-${Date.now()}`,
-//       generatedDate: new Date(),
-//       generatedBy: req.user.id,
-//       title: 'Low Stock Items Invoice',
-//       items: lowStockItems.map(item => ({
-//         name: item.name,
-//         category: item.category,
-//         currentStock: item.currentStock,
-//         minStockLevel: item.minStockLevel,
-//         unit: item.unit,
-//         shortfall: item.minStockLevel - item.currentStock,
-//         estimatedCost: item.estimatedCost || 0,
-//         totalCost: (item.minStockLevel - item.currentStock) * (item.estimatedCost || 0)
-//       })),
-//       totalItems: lowStockItems.length,
-//       totalEstimatedCost: lowStockItems.reduce((sum, item) =>
-//         sum + ((item.minStockLevel - item.currentStock) * (item.estimatedCost || 0)), 0
-//       )
-//     };
-
-//     res.json({ success: true, invoice });
-//   } catch (error) {
-//     res.status(500).json({ error: error.message });
-//   }
-// };
 exports.generateLowStockInvoice = async (req, res) => {
   try {
     const lowStockItems = await PantryItem.find({ 
@@ -313,6 +279,121 @@ exports.generateVendorInvoice = async (req, res) => {
     }));
 
     res.json({ success: true, invoice });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Upload pricing image for fulfillment
+exports.uploadPricingImage = async (req, res) => {
+  try {
+    const { image } = req.body;
+    
+    if (!image || !image.base64) {
+      return res.status(400).json({ error: 'Image data is required' });
+    }
+    
+    const fs = require('fs');
+    const path = require('path');
+    
+    const uploadsDir = path.join(__dirname, '../../uploads');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+    
+    const base64Data = image.base64.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64Data, 'base64');
+    
+    const timestamp = Date.now();
+    const filename = `pricing-${timestamp}-${image.name || 'image.jpg'}`;
+    const filepath = path.join(uploadsDir, filename);
+    
+    fs.writeFileSync(filepath, buffer);
+    
+    const imageUrl = `/uploads/${filename}`;
+    res.json({ success: true, imageUrl });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Fulfill invoice with pricing image and amount tracking
+exports.fulfillInvoice = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { newAmount, pricingImage, notes } = req.body;
+
+    const order = await PantryOrder.findById(orderId)
+      .populate('vendorId', 'name phone email');
+
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+
+
+    const previousAmount = order.totalAmount;
+    const difference = newAmount - previousAmount;
+
+    order.fulfillment = {
+      previousAmount,
+      newAmount,
+      difference,
+      pricingImage,
+      fulfilledAt: new Date(),
+      fulfilledBy: req.user?.id,
+      notes
+    };
+    order.status = 'fulfilled';
+    order.totalAmount = newAmount;
+
+    await order.save();
+
+
+
+    await order.populate([
+      { path: 'orderedBy', select: 'username email' },
+      { path: 'fulfillment.fulfilledBy', select: 'username email' }
+    ]);
+
+    res.json({ 
+      success: true, 
+      order,
+      fulfillment: {
+        previousAmount,
+        newAmount,
+        difference,
+        message: difference > 0 ? 'Amount increased' : difference < 0 ? 'Amount decreased' : 'No change in amount'
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Get fulfillment history for an order
+exports.getFulfillmentHistory = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    
+    const order = await PantryOrder.findById(orderId)
+      .populate('fulfillment.fulfilledBy', 'username email')
+      .populate('vendorId', 'name phone email');
+
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    res.json({ 
+      success: true, 
+      fulfillment: order.fulfillment,
+      orderDetails: {
+        id: order._id,
+        vendor: order.vendorId,
+        status: order.status,
+        createdAt: order.createdAt
+      }
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
