@@ -193,7 +193,7 @@ exports.updatePantryStock = async (req, res) => {
 exports.generateLowStockInvoice = async (req, res) => {
   try {
     const lowStockItems = await PantryItem.find({ 
-      currentStock: { $lte: 20 }
+      stockQuantity: { $lte: 20 }
     }).sort({ name: 1 });
 
     if (lowStockItems.length === 0) {
@@ -203,22 +203,22 @@ exports.generateLowStockInvoice = async (req, res) => {
     const invoice = {
       invoiceNumber: `LSI-${Date.now()}`,
       generatedDate: new Date(),
-      generatedBy: req.user.id,
+      generatedBy: req.user?.id || 'system',
       title: "Low Stock Items Invoice",
       items: lowStockItems.map((item) => ({
         name: item.name,
         category: item.category,
-        currentStock: item.currentStock,
+        currentStock: item.stockQuantity,
         minStockLevel: 20,
         unit: item.unit,
-        shortfall: Math.max(0, 20 - item.currentStock),
+        shortfall: Math.max(0, 20 - item.stockQuantity),
         estimatedCost: item.costPerUnit || 0,
-        totalCost: Math.max(0, 20 - item.currentStock) * (item.costPerUnit || 0)
+        totalCost: Math.max(0, 20 - item.stockQuantity) * (item.costPerUnit || 0)
       })),
       totalItems: lowStockItems.length,
       totalEstimatedCost: lowStockItems.reduce(
         (sum, item) =>
-          sum + (Math.max(0, 20 - item.currentStock) * (item.costPerUnit || 0)),
+          sum + (Math.max(0, 20 - item.stockQuantity) * (item.costPerUnit || 0)),
         0
       )
     };
