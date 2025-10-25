@@ -90,6 +90,17 @@ router.post(
   pantryController.uploadChalan
 );
 
+router.post(
+  "/disburse-to-kitchen",
+  pantryController.disburseToKitchen
+);
+
+router.get(
+  "/disbursement-history",
+  //authMiddleware(["admin", "staff"], ["pantry"]),
+  pantryController.getDisbursementHistory
+);
+
 router.put(
   "/fulfill-invoice/:orderId",
   authMiddleware(["admin", "staff"], ["pantry", "reception"]),
