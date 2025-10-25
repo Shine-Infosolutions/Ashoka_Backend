@@ -321,7 +321,7 @@ exports.uploadPricingImage = async (req, res) => {
 exports.fulfillInvoice = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { newAmount, pricingImage, notes } = req.body;
+    const { newAmount, pricingImage, chalanImage, notes } = req.body;
 
     const order = await PantryOrder.findById(orderId)
       .populate('vendorId', 'name phone email');
@@ -340,6 +340,7 @@ exports.fulfillInvoice = async (req, res) => {
       newAmount,
       difference,
       pricingImage,
+      chalanImage,
       fulfilledAt: new Date(),
       fulfilledBy: req.user?.id,
       notes
@@ -551,14 +552,82 @@ exports.uploadChalan = async (req, res) => {
     
     const chalanUrl = `/uploads/chalans/${filename}`;
     
-    // Update order with chalan
+    // Update order with chalan at both levels
     if (orderId) {
       await PantryOrder.findByIdAndUpdate(orderId, {
-        chalanImage: chalanUrl
+        chalanImage: chalanUrl,
+        'fulfillment.chalanImage': chalanUrl
       });
     }
     
     res.json({ success: true, chalanUrl });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+// Disburse items from store to kitchen
+exports.disburseToKitchen = async (req, res) => {
+  try {
+    const { items, notes } = req.body;
+    const Disbursement = require('../models/Disbursement');
+    
+    const disbursementData = {
+      disbursementNumber: `DSB-${Date.now()}`,
+      items: [],
+      totalItems: 0,
+      disbursedBy: req.user?.id,
+      disbursedAt: new Date(),
+      notes
+    };
+
+    for (const item of items) {
+      const pantryItem = await PantryItem.findById(item.itemId);
+      
+      if (!pantryItem) {
+        return res.status(404).json({ error: `Item ${item.itemId} not found` });
+      }
+      
+      if (pantryItem.stockQuantity < item.quantity) {
+        return res.status(400).json({ 
+          error: `Insufficient stock for ${pantryItem.name}. Available: ${pantryItem.stockQuantity}` 
+        });
+      }
+      
+      // Decrease pantry stock
+      pantryItem.stockQuantity -= item.quantity;
+      await pantryItem.save();
+      
+      disbursementData.items.push({
+        itemId: item.itemId,
+        itemName: pantryItem.name,
+        quantity: item.quantity,
+        unit: pantryItem.unit
+      });
+      
+      disbursementData.totalItems += item.quantity;
+    }
+
+    // Save disbursement to database
+    const disbursement = new Disbursement(disbursementData);
+    await disbursement.save();
+
+    res.json({ success: true, disbursement });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Get disbursement history
+exports.getDisbursementHistory = async (req, res) => {
+  try {
+    const Disbursement = require('../models/Disbursement');
+    
+    const disbursements = await Disbursement.find()
+      .populate('items.itemId', 'name unit')
+      .populate('disbursedBy', 'username email')
+      .sort({ disbursedAt: -1 });
+
+    res.json({ success: true, disbursements });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

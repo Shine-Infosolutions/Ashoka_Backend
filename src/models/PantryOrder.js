@@ -50,6 +50,7 @@ const PantryOrderSchema = new mongoose.Schema({
     newAmount: Number,
     difference: Number,
     pricingImage: String,
+    chalanImage: String,
     fulfilledAt: Date,
     fulfilledBy: {
       type: mongoose.Schema.Types.ObjectId,
