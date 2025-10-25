@@ -84,6 +84,12 @@ router.post(
   pantryController.uploadPricingImage
 );
 
+router.post(
+  "/upload-chalan",
+  authMiddleware(["admin", "staff"], ["pantry", "reception"]),
+  pantryController.uploadChalan
+);
+
 router.put(
   "/fulfill-invoice/:orderId",
   authMiddleware(["admin", "staff"], ["pantry", "reception"]),

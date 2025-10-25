@@ -522,3 +522,44 @@ exports.generatePantryItemsExcel = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// Upload chalan from store
+exports.uploadChalan = async (req, res) => {
+  try {
+    const { orderId, image } = req.body;
+    
+    if (!image || !image.base64) {
+      return res.status(400).json({ error: 'Chalan image is required' });
+    }
+    
+    const fs = require('fs');
+    const path = require('path');
+    
+    const uploadsDir = path.join(__dirname, '../../uploads/chalans');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+    
+    const base64Data = image.base64.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64Data, 'base64');
+    
+    const timestamp = Date.now();
+    const filename = `chalan-${timestamp}-${image.name || 'chalan.jpg'}`;
+    const filepath = path.join(uploadsDir, filename);
+    
+    fs.writeFileSync(filepath, buffer);
+    
+    const chalanUrl = `/uploads/chalans/${filename}`;
+    
+    // Update order with chalan
+    if (orderId) {
+      await PantryOrder.findByIdAndUpdate(orderId, {
+        chalanImage: chalanUrl
+      });
+    }
+    
+    res.json({ success: true, chalanUrl });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
