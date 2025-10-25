@@ -97,7 +97,7 @@ router.post(
 
 router.get(
   "/disbursement-history",
-  //authMiddleware(["admin", "staff"], ["pantry"]),
+  authMiddleware(["admin", "staff"], ["pantry"]),
   pantryController.getDisbursementHistory
 );
 
