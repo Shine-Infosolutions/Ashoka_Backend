@@ -527,6 +527,9 @@ exports.generatePantryItemsExcel = async (req, res) => {
 // Upload chalan from store
 exports.uploadChalan = async (req, res) => {
   try {
+    if (!req.body) {
+      return res.status(400).json({ error: 'Request body is required' });
+    }
     const { orderId, image } = req.body;
     
     if (!image || !image.base64) {
