@@ -6,6 +6,31 @@ const DisbursementSchema = new mongoose.Schema({
     required: true,
     unique: true
   },
+  type: {
+    type: String,
+    enum: ['kitchen_to_pantry', 'pantry_to_kitchen', 'stock_adjustment'],
+    required: true
+  },
+  fromLocation: {
+    kitchenOrderId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'KitchenOrder'
+    },
+    pantryId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Pantry'
+    }
+  },
+  toLocation: {
+    kitchenOrderId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'KitchenOrder'
+    },
+    pantryId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Pantry'
+    }
+  },
   items: [{
     itemId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -13,10 +38,25 @@ const DisbursementSchema = new mongoose.Schema({
       required: true
     },
     itemName: String,
-    quantity: Number,
-    unit: String
+    quantity: {
+      type: Number,
+      required: true
+    },
+    unit: String,
+    operation: {
+      type: String,
+      enum: ['add', 'subtract'],
+      required: true
+    },
+    previousStock: Number,
+    newStock: Number
   }],
   totalItems: Number,
+  status: {
+    type: String,
+    enum: ['pending', 'completed', 'cancelled'],
+    default: 'pending'
+  },
   disbursedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
