@@ -6,7 +6,7 @@ const KitchenOrder = require('../models/KitchenOrder');
 // Create disbursement with stock tracking
 const createDisbursement = async (req, res) => {
   try {
-    const { type, fromLocation, toLocation, items, disbursedBy, notes } = req.body;
+    const { type, items, disbursedBy, notes } = req.body;
     
     // Generate disbursement number
     const count = await Disbursement.countDocuments();
@@ -58,8 +58,6 @@ const createDisbursement = async (req, res) => {
     const disbursement = new Disbursement({
       disbursementNumber,
       type,
-      fromLocation,
-      toLocation,
       items: processedItems,
       totalItems: processedItems.length,
       disbursedBy,
@@ -81,8 +79,6 @@ const getAllDisbursements = async (req, res) => {
     const disbursements = await Disbursement.find()
       .populate('items.itemId', 'name unit')
       .populate('disbursedBy', 'name')
-      .populate('fromLocation.kitchenId', 'name')
-      .populate('toLocation.pantryId', 'name')
       .sort({ createdAt: -1 });
     res.json(disbursements);
   } catch (error) {
