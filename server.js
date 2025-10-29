@@ -48,6 +48,8 @@ const staffRoutes = require("./src/routes/staffRoutes.js");
 const vendorRoutes = require("./src/routes/vendorRoutes.js");
 const roomInspectionRoutes = require("./src/routes/roomInspectionRoutes.js");
 const pantryCategoryRoutes = require("./src/routes/pantryCategoryRoutes.js");
+const kitchenOrderRoutes = require("./src/routes/kitchenRoutes.js");
+const disbursementRoutes = require("./src/routes/disbursementRoutes.js");
 const path = require("path");
 // Initialize express app
 const app = express();
@@ -159,6 +161,8 @@ app.use("/api/staff", staffRoutes);
 app.use("/api/vendor", vendorRoutes);
 app.use("/api/room-inspections", roomInspectionRoutes);
 app.use("/api/pantry-categories", pantryCategoryRoutes);
+app.use("/api/kitchen-orders", kitchenOrderRoutes);
+app.use("/api/disbursements", disbursementRoutes);
 
 // Health check endpoint
 app.get("/health", (req, res) => {
