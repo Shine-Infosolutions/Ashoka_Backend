@@ -11,26 +11,6 @@ const DisbursementSchema = new mongoose.Schema({
     enum: ['kitchen_to_pantry', 'pantry_to_kitchen', 'stock_adjustment'],
     required: true
   },
-  fromLocation: {
-    kitchenOrderId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'KitchenOrder'
-    },
-    pantryId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Pantry'
-    }
-  },
-  toLocation: {
-    kitchenOrderId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'KitchenOrder'
-    },
-    pantryId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Pantry'
-    }
-  },
   items: [{
     itemId: {
       type: mongoose.Schema.Types.ObjectId,
