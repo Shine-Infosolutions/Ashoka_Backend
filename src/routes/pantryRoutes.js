@@ -1,30 +1,30 @@
 const express = require("express");
 const router = express.Router();
 const pantryController = require("../controllers/pantryController");
-const authMiddleware = require("../middleware/authMiddleware");
+const { authMiddleware } = require("../middleware/authMiddleware");
 
 // Pantry Items Routes
 router.get(
   "/items",
-  authMiddleware(["admin", "staff"], ["kitchen", "pantry", "reception"]),
+  authMiddleware(["admin", "staff", "pantry"]),
   pantryController.getAllPantryItems
 );
 
 router.get(
   "/items/low-stock",
-  authMiddleware(["admin", "staff"], ["pantry", "reception"]),
+  authMiddleware(["admin", "staff", "pantry"], ["pantry", "reception"]),
   pantryController.getLowStockPantryItems
 );
 
 router.post(
   "/items",
-  authMiddleware(["admin", "staff"], ["pantry"]),
+  authMiddleware(["admin", "staff", "pantry"], ["pantry"]),
   pantryController.createPantryItem
 );
 
 router.put(
   "/items/:id",
-  authMiddleware(["admin", "staff"], ["pantry"]),
+  authMiddleware(["admin", "staff", "pantry"], ["pantry"]),
   pantryController.updatePantryItem
 );
 
@@ -36,7 +36,7 @@ router.delete(
 
 router.patch(
   "/items/:id/stock",
-  authMiddleware(["admin", "staff"], ["pantry"]),
+  authMiddleware(["admin", "staff", "pantry"], ["pantry"]),
   pantryController.updatePantryStock
 );
 
@@ -55,13 +55,13 @@ router.get(
 // Pantry Orders Routes
 router.get(
   "/orders",
-  authMiddleware(["admin", "staff"], ["kitchen", "pantry", "reception"]),
+  authMiddleware(["admin", "staff", "pantry"]),
   pantryController.getPantryOrders
 );
 
 router.post(
   "/orders",
-  authMiddleware(["admin", "staff"], ["kitchen", "pantry"]),
+  authMiddleware(["admin", "staff", "pantry"], ["kitchen", "pantry"]),
   pantryController.createPantryOrder
 );
 

@@ -24,6 +24,10 @@ const KitchenOrderSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "Vendor"
   },
+  pantryOrderId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "PantryOrder"
+  },
   status: {
     type: String,
     enum: ['pending', 'approved', 'preparing', 'ready', 'delivered', 'fulfilled', 'cancelled'],
@@ -31,13 +35,16 @@ const KitchenOrderSchema = new mongoose.Schema({
   },
   orderType: {
     type: String,
-    enum: ['kitchen_preparation', 'kitchen_to_pantry',  'kitchen_to_vendor'],
+    enum: ['kitchen_preparation', 'kitchen_to_pantry', 'pantry_to_kitchen', 'kitchen_to_vendor'],
     default: 'kitchen_preparation'
   },
   specialInstructions: {
     type: String
   },
   deliveredAt: {
+    type: Date
+  },
+  receivedAt: {
     type: Date
   }
 }, { timestamps: true });

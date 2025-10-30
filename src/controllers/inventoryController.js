@@ -6,7 +6,7 @@ const RoomInventoryChecklist = require('../models/RoomInventoryChecklist');
 exports.getItems = async (req, res) => {
   try {
     const items = await Inventory.find().sort({ name: 1 });
-    res.json({ success: true, items });
+    res.json(items);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -17,31 +17,45 @@ exports.createItem = async (req, res) => {
   try {
     const item = new Inventory(req.body);
     await item.save();
-    res.status(201).json({ success: true, item });
+    res.status(201).json(item);
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 };
 
-// Update item stock
-exports.updateStock = async (req, res) => {
+// Update inventory item
+exports.updateItem = async (req, res) => {
   try {
-    const { itemId } = req.params;
-    const { currentStock } = req.body;
-    
+    const { id } = req.params;
     const item = await Inventory.findByIdAndUpdate(
-      itemId,
-      { currentStock },
-      { new: true }
+      id,
+      req.body,
+      { new: true, runValidators: true }
     );
     
     if (!item) {
       return res.status(404).json({ error: 'Item not found' });
     }
     
-    res.json({ success: true, item });
+    res.json(item);
   } catch (error) {
     res.status(400).json({ error: error.message });
+  }
+};
+
+// Delete inventory item
+exports.deleteItem = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const item = await Inventory.findByIdAndDelete(id);
+    
+    if (!item) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+    
+    res.json({ message: 'Item deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 };
 

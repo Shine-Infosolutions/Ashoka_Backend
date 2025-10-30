@@ -96,6 +96,55 @@ exports.createPantryOrder = async (req, res) => {
 
     await order.save();
 
+    // If order type is "Pantry to Kitchen", directly update kitchen store
+    if (req.body.orderType === 'Pantry to Kitchen') {
+      try {
+        const KitchenStore = require('../models/KitchenStore');
+        
+        // Populate items to get item details
+        await order.populate('items.itemId', 'name unit');
+        
+        // Directly add items to kitchen store
+        for (const orderItem of order.items) {
+          let kitchenItem = await KitchenStore.findOne({ 
+            name: orderItem.itemId.name 
+          });
+          
+          if (kitchenItem) {
+            // Update existing item quantity
+            kitchenItem.quantity = Number(kitchenItem.quantity) + Number(orderItem.quantity);
+            await kitchenItem.save();
+            console.log(`Updated kitchen store: ${kitchenItem.name} +${orderItem.quantity} = ${kitchenItem.quantity}`);
+          } else {
+            // Create new kitchen store item
+            kitchenItem = new KitchenStore({
+              name: orderItem.itemId.name,
+              category: 'Food',
+              quantity: Number(orderItem.quantity),
+              unit: orderItem.itemId.unit || 'pcs'
+            });
+            await kitchenItem.save();
+            console.log(`Created new kitchen store item: ${kitchenItem.name} with ${orderItem.quantity} ${kitchenItem.unit}`);
+          }
+        }
+        
+        // Set order status to fulfilled since items are directly added to kitchen store
+        order.status = 'fulfilled';
+        order.deliveredAt = new Date();
+        order.fulfillment = {
+          fulfilledAt: new Date(),
+          fulfilledBy: req.user?.id,
+          notes: 'Automatically fulfilled - items sent to kitchen store'
+        };
+        await order.save();
+        
+        console.log('Items directly added to kitchen store from pantry order');
+      } catch (kitchenStoreError) {
+        console.error('Failed to update kitchen store:', kitchenStoreError);
+        // Don't fail the pantry order if kitchen store update fails
+      }
+    }
+
     // Populate both orderedBy and vendorId
     await order.populate([
       { path: "orderedBy", select: "username email" },
@@ -140,6 +189,8 @@ exports.updatePantryOrderStatus = async (req, res) => {
 
     order.status = status;
 
+    // Pantry to Kitchen orders are automatically delivered to kitchen store
+
     // ✅ If status is delivered or fulfilled → update stock
     if (["delivered", "fulfilled"].includes(status)) {
       order.deliveredAt = new Date();
@@ -159,8 +210,10 @@ exports.updatePantryOrderStatus = async (req, res) => {
       { path: "vendorId", select: "name phone email" }
     ]);
 
+    console.log(`Pantry order ${req.params.id} status updated to: ${status}`);
     res.json({ success: true, order });
   } catch (error) {
+    console.error('Update pantry order status error:', error);
     res.status(400).json({ error: error.message });
   }
 };

@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const housekeepingController = require('../controllers/housekeepingController');
 const uploadController = require('../controllers/uploadController');
-const authMiddleware = require('../middleware/authMiddleware');
+const { authMiddleware } = require('../middleware/authMiddleware');
 
 // 🔹 Housekeeping Tasks
 router.post('/tasks', housekeepingController.createTask);

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const inventoryController = require('../controllers/inventoryController');
-const authMiddleware = require('../middleware/authMiddleware');
+const { authMiddleware } = require('../middleware/authMiddleware');
 
 // Get all inventory items
 router.get('/items', authMiddleware(['admin', 'staff']), inventoryController.getItems);
@@ -9,8 +9,11 @@ router.get('/items', authMiddleware(['admin', 'staff']), inventoryController.get
 // Create inventory item
 router.post('/items', authMiddleware(['admin', 'staff']), inventoryController.createItem);
 
-// Update item stock
-router.put('/items/:itemId/stock', authMiddleware(['admin', 'staff']), inventoryController.updateStock);
+// Update inventory item
+router.put('/items/:id', authMiddleware(['admin', 'staff']), inventoryController.updateItem);
+
+// Delete inventory item
+router.delete('/items/:id', authMiddleware(['admin', 'staff']), inventoryController.deleteItem);
 
 // Get all transactions
 router.get('/transactions', authMiddleware(['admin', 'staff']), inventoryController.getTransactions);

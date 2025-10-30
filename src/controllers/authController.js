@@ -35,11 +35,11 @@ exports.register = async (req, res) => {
     if (!email || !username || !password || !role) {
       return res.status(400).json({ message: "Missing required fields" });
     }
-    if (!["admin", "staff", "restaurant"].includes(role)) {
+    if (!["admin", "staff", "restaurant", "pantry"].includes(role)) {
       return res
         .status(400)
         .json({
-          message: "Invalid role. Only admin, staff, or restaurant allowed.",
+          message: "Invalid role. Only admin, staff, restaurant, or pantry allowed.",
         });
     }
 
@@ -72,9 +72,12 @@ exports.register = async (req, res) => {
         { id: 4, name: "maintenance" },
         { id: 5, name: "other" },
         { id: 6, name: "housekeeping" },
+        { id: 7, name: "pantry" },
       ];
     } else if (role === "restaurant") {
       userData.restaurantRole = restaurantRole;
+    } else if (role === "pantry") {
+      userData.department = [{ id: 7, name: "pantry" }];
     }
 
     const user = new User(userData);
@@ -154,6 +157,9 @@ exports.getStaffProfile = async (req, res) => {
       responseData.isAdmin = true;
     } else if (user.role === "restaurant") {
       responseData.restaurantRole = user.restaurantRole;
+    } else if (user.role === "pantry") {
+      responseData.departments = user.department;
+      responseData.isPantryStaff = true;
     }
 
     res.json(responseData);
@@ -262,7 +268,7 @@ exports.updateUser = async (req, res) => {
     // Validate role if provided
     if (
       updates.role &&
-      !["admin", "staff", "restaurant"].includes(updates.role)
+      !["admin", "staff", "restaurant", "pantry"].includes(updates.role)
     ) {
       return res.status(400).json({ message: "Invalid role" });
     }

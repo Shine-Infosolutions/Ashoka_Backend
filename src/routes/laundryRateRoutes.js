@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const laundryRateController = require("../controllers/laundryRateController");
-const authMiddleware = require("../middleware/authMiddleware");
+const { authMiddleware } = require("../middleware/authMiddleware");
 
 // Create a laundry rate
 router.post(

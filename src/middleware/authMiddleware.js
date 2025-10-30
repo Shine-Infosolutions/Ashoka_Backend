@@ -14,7 +14,7 @@ function authMiddleware(roles = [], departments = []) {
         return res.status(403).json({ message: 'Access denied: role' });
       }
 
-      // ✅ Department check for staff users only (admins bypass department check)
+      // ✅ Department check for staff users only (admins and pantry bypass department check)
       if (departments.length && user.role === 'staff') {
         let userDepartments = [];
 
@@ -46,4 +46,38 @@ function authMiddleware(roles = [], departments = []) {
   };
 }
 
-module.exports = authMiddleware;
+// Middleware to restrict pantry users to only pantry routes
+function restrictPantryAccess(req, res, next) {
+  // Skip auth routes
+  if (req.path.startsWith('/api/auth')) {
+    return next();
+  }
+  
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return next(); // Let other middleware handle auth
+
+  jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret', (err, user) => {
+    if (err) return next(); // Let other middleware handle auth errors
+    
+    if (user.role === 'pantry') {
+      const allowedPaths = [
+        '/pantry', 
+        '/pantry-categories', 
+        '/dashboard', 
+        '/vendor',
+        '/inventory',
+        '/purchase-orders'
+      ];
+      const isAllowed = allowedPaths.some(path => req.path.startsWith(path));
+      
+      if (!isAllowed) {
+        return res.status(403).json({ message: 'Access denied: pantry users can only access pantry routes' });
+      }
+    }
+    
+    next();
+  });
+}
+
+module.exports = { authMiddleware, restrictPantryAccess };

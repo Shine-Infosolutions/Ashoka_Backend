@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const laundryController = require("../controllers/laundryController");
-const authMiddleware = require("../middleware/authMiddleware");
+const { authMiddleware } = require("../middleware/authMiddleware");
 
 // Create laundry order
 router.post("/order", laundryController.createLaundryOrder);

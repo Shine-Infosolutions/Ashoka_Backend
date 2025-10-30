@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const tableController = require('../controllers/tableController');
-const authMiddleware = require('../middleware/authMiddleware');
+const { authMiddleware } = require('../middleware/authMiddleware');
 
 // Get all tables
 router.get('/tables', authMiddleware(['admin', 'staff', 'restaurant']), tableController.getAllTables);

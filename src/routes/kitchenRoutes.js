@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { authMiddleware } = require('../middleware/authMiddleware');
 const {
   getAllKitchenOrders,
   getKitchenOrderById,
@@ -9,10 +10,10 @@ const {
 } = require('../controllers/kitchenOrderController');
 
 // Kitchen Order routes
-router.get('/', getAllKitchenOrders);
-router.get('/:id', getKitchenOrderById);
-router.post('/', createKitchenOrder);
-router.put('/:id', updateKitchenOrder);
-router.delete('/:id', deleteKitchenOrder);
+router.get('/', authMiddleware(['admin', 'staff']), getAllKitchenOrders);
+router.get('/:id', authMiddleware(['admin', 'staff']), getKitchenOrderById);
+router.post('/', authMiddleware(['admin', 'staff']), createKitchenOrder);
+router.put('/:id', authMiddleware(['admin', 'staff']), updateKitchenOrder);
+router.delete('/:id', authMiddleware(['admin', 'staff']), deleteKitchenOrder);
 
 module.exports = router;

@@ -49,6 +49,8 @@ const vendorRoutes = require("./src/routes/vendorRoutes.js");
 const roomInspectionRoutes = require("./src/routes/roomInspectionRoutes.js");
 const pantryCategoryRoutes = require("./src/routes/pantryCategoryRoutes.js");
 const kitchenOrderRoutes = require("./src/routes/kitchenRoutes.js");
+const kitchenStoreRoutes = require("./src/routes/kitchenStoreRoutes.js");
+const { restrictPantryAccess } = require("./src/middleware/authMiddleware.js");
 
 const path = require("path");
 // Initialize express app
@@ -94,6 +96,9 @@ app.use(express.json({ limit: "50mb" }));
 
 // Serve uploaded files for fallback method
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+// Apply pantry access restriction globally
+app.use('/api', restrictPantryAccess);
 
 // Database connection
 let isConnected = false;
@@ -162,6 +167,7 @@ app.use("/api/vendor", vendorRoutes);
 app.use("/api/room-inspections", roomInspectionRoutes);
 app.use("/api/pantry-categories", pantryCategoryRoutes);
 app.use("/api/kitchen-orders", kitchenOrderRoutes);
+app.use("/api/kitchen-store", kitchenStoreRoutes);
 
 
 // Health check endpoint
