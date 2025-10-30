@@ -4,7 +4,7 @@ const userSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
-  role: { type: String, enum: ['admin', 'staff', 'restaurant', 'pantry'], required: true },
+  role: { type: String, enum: ['admin', 'staff', 'restaurant', 'pantry', 'chef'], required: true },
   restaurantRole: { type: String, enum: ['staff', 'cashier', 'chef'], required: false },
   department: {
     type: mongoose.Schema.Types.Mixed, // can be string or array

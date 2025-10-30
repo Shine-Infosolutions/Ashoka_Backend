@@ -30,8 +30,36 @@ const getKitchenOrderById = async (req, res) => {
 // Create new kitchen order
 const createKitchenOrder = async (req, res) => {
   try {
-    const order = new KitchenOrder(req.body);
+    const orderData = {
+      ...req.body,
+      orderedBy: req.user?.id || req.body.orderedBy
+    };
+    
+    const order = new KitchenOrder(orderData);
     const savedOrder = await order.save();
+    
+    // If kitchen to pantry order, create corresponding pantry order
+    if (req.body.orderType === 'kitchen_to_pantry') {
+      try {
+        const PantryOrder = require('../models/PantryOrder');
+        
+        const pantryOrder = new PantryOrder({
+          items: savedOrder.items,
+          totalAmount: savedOrder.totalAmount,
+          orderType: 'Kitchen to Pantry',
+          specialInstructions: savedOrder.specialInstructions,
+          orderedBy: savedOrder.orderedBy,
+          kitchenOrderId: savedOrder._id,
+          status: 'pending'
+        });
+        
+        await pantryOrder.save();
+        console.log('Pantry order created:', pantryOrder._id);
+      } catch (error) {
+        console.error('Failed to create pantry order:', error);
+      }
+    }
+    
     res.status(201).json(savedOrder);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -56,24 +84,21 @@ const updateKitchenOrder = async (req, res) => {
       return res.status(404).json({ message: 'Kitchen order not found' });
     }
 
-    // Update kitchen store when items are received
-    if (req.body.status === 'delivered' && order.items && order.items.length > 0) {
+    // Update kitchen store when items are received from pantry
+    if (req.body.status === 'delivered' && order.orderType === 'kitchen_to_pantry' && order.items && order.items.length > 0) {
       try {
         const KitchenStore = require('../models/KitchenStore');
         
         for (const orderItem of order.items) {
-          // Find existing kitchen store item by name
           let kitchenItem = await KitchenStore.findOne({ 
             name: orderItem.itemId.name 
           });
           
           if (kitchenItem) {
-            // Update existing item quantity (ensure numeric addition)
             kitchenItem.quantity = Number(kitchenItem.quantity) + Number(orderItem.quantity);
             await kitchenItem.save();
             console.log(`Updated kitchen store: ${kitchenItem.name} +${orderItem.quantity} = ${kitchenItem.quantity}`);
           } else {
-            // Create new kitchen store item
             kitchenItem = new KitchenStore({
               name: orderItem.itemId.name,
               category: 'Food',

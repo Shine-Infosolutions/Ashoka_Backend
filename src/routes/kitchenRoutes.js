@@ -10,10 +10,10 @@ const {
 } = require('../controllers/kitchenOrderController');
 
 // Kitchen Order routes
-router.get('/', authMiddleware(['admin', 'staff']), getAllKitchenOrders);
-router.get('/:id', authMiddleware(['admin', 'staff']), getKitchenOrderById);
-router.post('/', authMiddleware(['admin', 'staff']), createKitchenOrder);
-router.put('/:id', authMiddleware(['admin', 'staff']), updateKitchenOrder);
-router.delete('/:id', authMiddleware(['admin', 'staff']), deleteKitchenOrder);
+router.get('/', authMiddleware(['admin', 'staff', 'restaurant']), getAllKitchenOrders);
+router.get('/:id', authMiddleware(['admin', 'staff', 'restaurant']), getKitchenOrderById);
+router.post('/', authMiddleware(['admin', 'staff', 'restaurant']), createKitchenOrder);
+router.put('/:id', authMiddleware(['admin', 'staff', 'restaurant']), updateKitchenOrder);
+router.delete('/:id', authMiddleware(['admin', 'staff', 'restaurant']), deleteKitchenOrder);
 
 module.exports = router;

@@ -6,7 +6,7 @@ const { authMiddleware } = require("../middleware/authMiddleware");
 // Pantry Items Routes
 router.get(
   "/items",
-  authMiddleware(["admin", "staff", "pantry"]),
+  authMiddleware(["admin", "staff", "pantry", "restaurant"]),
   pantryController.getAllPantryItems
 );
 
@@ -67,13 +67,13 @@ router.post(
 
 router.patch(
   "/orders/:id/status",
-  authMiddleware(["admin", "staff"], ["pantry", "reception"]),
+  authMiddleware(["admin", "staff", "pantry"]),
   pantryController.updatePantryOrderStatus
 );
 
 router.delete(
   "/orders/:id",
-  authMiddleware(["admin", "staff"], ["pantry", "reception"]),
+  authMiddleware(["admin"]),
   pantryController.deletePantryOrder
 );
 
