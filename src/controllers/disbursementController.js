@@ -92,12 +92,15 @@ exports.createDisbursement = async (req, res) => {
 // Get all disbursements
 exports.getAllDisbursements = async (req, res) => {
   try {
+    console.log('Fetching all disbursements...');
     const disbursements = await Disbursement.find()
-      .populate('items.itemId', 'name')
+      .populate('items.itemId', 'name category unit')
       .populate('createdBy', 'username')
       .sort({ createdAt: -1 });
+    console.log('Disbursements found:', disbursements.length);
     res.json(disbursements);
   } catch (error) {
+    console.error('Error fetching disbursements:', error);
     res.status(500).json({ error: error.message });
   }
 };
