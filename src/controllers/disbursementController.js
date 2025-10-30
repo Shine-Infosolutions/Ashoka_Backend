@@ -1,5 +1,5 @@
 const Disbursement = require('../models/Disbursement');
-const PantryItem = require('../models/PantryItem');
+const Inventory = require('../models/Inventory');
 const KitchenStore = require('../models/KitchenStore');
 
 // Create disbursement
@@ -32,11 +32,11 @@ exports.createDisbursement = async (req, res) => {
           existingItem.disbursementId = disbursement._id;
           await existingItem.save();
         } else {
-          const pantryItem = await PantryItem.findById(item.itemId);
+          const inventoryItem = await Inventory.findById(item.itemId);
           await KitchenStore.create({
             itemId: item.itemId,
             quantity: item.quantity,
-            unit: pantryItem?.unit || 'pcs',
+            unit: inventoryItem?.unit || 'pcs',
             disbursementId: disbursement._id
           });
         }

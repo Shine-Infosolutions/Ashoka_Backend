@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const kitchenStoreSchema = new mongoose.Schema({
   itemId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'PantryItem',
+    ref: 'Inventory',
     required: true
   },
   quantity: {
