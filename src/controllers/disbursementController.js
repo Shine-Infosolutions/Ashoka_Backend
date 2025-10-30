@@ -5,12 +5,16 @@ const KitchenStore = require('../models/KitchenStore');
 // Create disbursement
 exports.createDisbursement = async (req, res) => {
   try {
+    console.log('Disbursement creation started:', req.body);
     const { type, items, notes } = req.body;
     
+    console.log('Counting documents...');
     // Generate disbursement number
     const count = await Disbursement.countDocuments();
+    console.log('Document count:', count);
     const disbursementNumber = `DISB${String(count + 1).padStart(4, '0')}`;
     
+    console.log('Creating disbursement object...');
     const disbursement = new Disbursement({
       disbursementNumber,
       type,
@@ -20,47 +24,66 @@ exports.createDisbursement = async (req, res) => {
       status: 'pending'
     });
     
+    console.log('Saving disbursement...');
     await disbursement.save();
+    console.log('Disbursement saved successfully');
     
+    console.log('Checking if need to update kitchen store...');
     // Update kitchen store if disbursing to kitchen
     if (type === 'pantry_to_kitchen') {
+      console.log('Updating kitchen store for', items.length, 'items');
       for (const item of items) {
+        console.log('Processing item:', item.itemId);
         const existingItem = await KitchenStore.findOne({ itemId: item.itemId });
+        console.log('Existing item found:', !!existingItem);
         if (existingItem) {
           existingItem.quantity += item.quantity;
           existingItem.lastUpdated = new Date();
           existingItem.disbursementId = disbursement._id;
           await existingItem.save();
+          console.log('Updated existing item');
         } else {
+          console.log('Creating new kitchen store item');
           const inventoryItem = await Inventory.findById(item.itemId);
+          console.log('Inventory item found:', !!inventoryItem);
           await KitchenStore.create({
             itemId: item.itemId,
             quantity: item.quantity,
             unit: inventoryItem?.unit || 'pcs',
             disbursementId: disbursement._id
           });
+          console.log('Created new kitchen store item');
         }
       }
+      console.log('Kitchen store update completed');
     }
     
-    // 🔥 WebSocket: Emit disbursement event
-    const io = req.app.get('io');
-    if (io) {
-      io.to('waiters').emit('disbursement-created', {
-        disbursement,
-        type,
-        itemCount: items.length
-      });
-      
-      if (type === 'pantry_to_kitchen') {
-        io.to('waiters').emit('kitchen-store-updated', {
-          disbursementId: disbursement._id,
-          items
-        });
-      }
-    }
-    
+    console.log('About to send response...');
     res.status(201).json(disbursement);
+    console.log('Response sent successfully');
+    
+    // 🔥 WebSocket: Emit disbursement event (after response)
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        console.log('Emitting WebSocket events...');
+        io.emit('disbursement-created', {
+          disbursement,
+          type,
+          itemCount: items.length
+        });
+        
+        if (type === 'pantry_to_kitchen') {
+          io.emit('kitchen-store-updated', {
+            disbursementId: disbursement._id,
+            items
+          });
+        }
+        console.log('WebSocket events emitted');
+      }
+    } catch (wsError) {
+      console.error('WebSocket error (non-blocking):', wsError);
+    }
   } catch (error) {
     res.status(400).json({ error: error.message });
   }

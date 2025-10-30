@@ -14,7 +14,7 @@ const disbursementSchema = new mongoose.Schema({
   items: [{
     itemId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'PantryItem',
+      ref: 'Inventory',
       required: true
     },
     quantity: {
