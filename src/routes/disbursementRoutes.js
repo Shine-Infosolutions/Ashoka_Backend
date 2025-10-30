@@ -1,15 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const {
-  createDisbursement,
-  getAllDisbursements,
-  getDisbursementById,
-  getStockTrackingReport
-} = require('../controllers/disbursementController');
+const disbursementController = require('../controllers/disbursementController');
+const authMiddleware = require('../middleware/authMiddleware');
 
-router.post('/', createDisbursement);
-router.get('/', getAllDisbursements);
-router.get('/tracking', getStockTrackingReport);
-router.get('/:id', getDisbursementById);
+router.post('/', authMiddleware, disbursementController.createDisbursement);
+router.get('/', authMiddleware, disbursementController.getAllDisbursements);
+router.get('/kitchen-store', authMiddleware, disbursementController.getKitchenStore);
+router.patch('/:id/status', authMiddleware, disbursementController.updateDisbursementStatus);
 
 module.exports = router;

@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const DisbursementSchema = new mongoose.Schema({
+const disbursementSchema = new mongoose.Schema({
   disbursementNumber: {
     type: String,
     required: true,
@@ -8,7 +8,7 @@ const DisbursementSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['kitchen_to_pantry', 'pantry_to_kitchen', 'stock_adjustment'],
+    enum: ['pantry_to_kitchen', 'kitchen_to_pantry', 'stock_adjustment'],
     required: true
   },
   items: [{
@@ -17,35 +17,28 @@ const DisbursementSchema = new mongoose.Schema({
       ref: 'PantryItem',
       required: true
     },
-    itemName: String,
     quantity: {
       type: Number,
-      required: true
-    },
-    unit: String,
-    operation: {
-      type: String,
-      enum: ['add', 'subtract'],
-      required: true
-    },
-    previousStock: Number,
-    newStock: Number
+      required: true,
+      min: 1
+    }
   }],
-  totalItems: Number,
   status: {
     type: String,
-    enum: ['pending', 'completed', 'cancelled'],
+    enum: ['pending', 'approved', 'completed', 'cancelled'],
     default: 'pending'
   },
-  disbursedBy: {
+  notes: String,
+  createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   },
   disbursedAt: {
     type: Date,
     default: Date.now
-  },
-  notes: String
-}, { timestamps: true });
+  }
+}, {
+  timestamps: true
+});
 
-module.exports = mongoose.model('Disbursement', DisbursementSchema);
+module.exports = mongoose.model('Disbursement', disbursementSchema);

@@ -1,133 +1,123 @@
 const Disbursement = require('../models/Disbursement');
 const PantryItem = require('../models/PantryItem');
-const KitchenOrder = require('../models/KitchenOrder');
+const KitchenStore = require('../models/KitchenStore');
 
-
-// Create disbursement with stock tracking
-const createDisbursement = async (req, res) => {
+// Create disbursement
+exports.createDisbursement = async (req, res) => {
   try {
-    const { type, items, disbursedBy, notes } = req.body;
+    const { type, items, notes } = req.body;
     
     // Generate disbursement number
     const count = await Disbursement.countDocuments();
-    const disbursementNumber = `DSB${String(count + 1).padStart(6, '0')}`;
-    
-    // Process items and update stock
-    const processedItems = [];
-    
-    for (const item of items) {
-      const pantryItem = await PantryItem.findById(item.itemId);
-      if (!pantryItem) {
-        return res.status(404).json({ message: `Item ${item.itemId} not found` });
-      }
-      
-      const previousStock = pantryItem.stockQuantity;
-      let newStock;
-      let operation;
-      
-      // Determine operation based on disbursement type
-      if (type === 'kitchen_to_pantry') {
-        operation = 'add';
-        newStock = previousStock + item.quantity;
-      } else if (type === 'pantry_to_kitchen') {
-        operation = 'subtract';
-        newStock = previousStock - item.quantity;
-        
-        if (newStock < 0) {
-          return res.status(400).json({ 
-            message: `Insufficient stock for ${pantryItem.name}. Available: ${previousStock}` 
-          });
-        }
-      }
-      
-      // Update pantry item stock
-      pantryItem.stockQuantity = newStock;
-      await pantryItem.save();
-      
-      processedItems.push({
-        itemId: item.itemId,
-        itemName: pantryItem.name,
-        quantity: item.quantity,
-        unit: pantryItem.unit,
-        operation,
-        previousStock,
-        newStock
-      });
-    }
+    const disbursementNumber = `DISB${String(count + 1).padStart(4, '0')}`;
     
     const disbursement = new Disbursement({
       disbursementNumber,
       type,
-      items: processedItems,
-      totalItems: processedItems.length,
-      disbursedBy,
-      status: 'completed',
-      notes
+      items,
+      notes,
+      createdBy: req.user?.id,
+      status: 'pending'
     });
     
     await disbursement.save();
-    res.status(201).json(disbursement);
     
+    // Update kitchen store if disbursing to kitchen
+    if (type === 'pantry_to_kitchen') {
+      for (const item of items) {
+        const existingItem = await KitchenStore.findOne({ itemId: item.itemId });
+        if (existingItem) {
+          existingItem.quantity += item.quantity;
+          existingItem.lastUpdated = new Date();
+          existingItem.disbursementId = disbursement._id;
+          await existingItem.save();
+        } else {
+          const pantryItem = await PantryItem.findById(item.itemId);
+          await KitchenStore.create({
+            itemId: item.itemId,
+            quantity: item.quantity,
+            unit: pantryItem?.unit || 'pcs',
+            disbursementId: disbursement._id
+          });
+        }
+      }
+    }
+    
+    // 🔥 WebSocket: Emit disbursement event
+    const io = req.app.get('io');
+    if (io) {
+      io.to('waiters').emit('disbursement-created', {
+        disbursement,
+        type,
+        itemCount: items.length
+      });
+      
+      if (type === 'pantry_to_kitchen') {
+        io.to('waiters').emit('kitchen-store-updated', {
+          disbursementId: disbursement._id,
+          items
+        });
+      }
+    }
+    
+    res.status(201).json(disbursement);
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    res.status(400).json({ error: error.message });
   }
 };
 
 // Get all disbursements
-const getAllDisbursements = async (req, res) => {
+exports.getAllDisbursements = async (req, res) => {
   try {
     const disbursements = await Disbursement.find()
-      .populate('items.itemId', 'name unit')
-      .populate('disbursedBy', 'name')
+      .populate('items.itemId', 'name')
+      .populate('createdBy', 'username')
       .sort({ createdAt: -1 });
     res.json(disbursements);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ error: error.message });
   }
 };
 
-// Get disbursement by ID
-const getDisbursementById = async (req, res) => {
+// Update disbursement status
+exports.updateDisbursementStatus = async (req, res) => {
   try {
-    const disbursement = await Disbursement.findById(req.params.id)
-      .populate('items.itemId', 'name unit')
-      .populate('disbursedBy', 'name');
+    const { status } = req.body;
+    const disbursement = await Disbursement.findByIdAndUpdate(
+      req.params.id,
+      { status },
+      { new: true }
+    );
+    
     if (!disbursement) {
-      return res.status(404).json({ message: 'Disbursement not found' });
+      return res.status(404).json({ error: 'Disbursement not found' });
     }
+    
+    // 🔥 WebSocket: Emit status update
+    const io = req.app.get('io');
+    if (io) {
+      io.to('waiters').emit('disbursement-status-updated', {
+        disbursementId: disbursement._id,
+        status: disbursement.status,
+        type: disbursement.type
+      });
+    }
+    
     res.json(disbursement);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(400).json({ error: error.message });
   }
 };
 
-// Get stock tracking report
-const getStockTrackingReport = async (req, res) => {
+// Get kitchen store items
+exports.getKitchenStore = async (req, res) => {
   try {
-    const { itemId, startDate, endDate } = req.query;
-    
-    let filter = {};
-    if (itemId) filter['items.itemId'] = itemId;
-    if (startDate && endDate) {
-      filter.createdAt = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate)
-      };
-    }
-    
-    const disbursements = await Disbursement.find(filter)
-      .populate('items.itemId', 'name unit')
-      .sort({ createdAt: -1 });
-    
-    res.json(disbursements);
+    const kitchenItems = await KitchenStore.find()
+      .populate('itemId', 'name category')
+      .populate('disbursementId', 'disbursementNumber')
+      .sort({ lastUpdated: -1 });
+    res.json(kitchenItems);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ error: error.message });
   }
-};
-
-module.exports = {
-  createDisbursement,
-  getAllDisbursements,
-  getDisbursementById,
-  getStockTrackingReport
 };
