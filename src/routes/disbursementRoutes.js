@@ -9,7 +9,7 @@ router.get('/test', (req, res) => {
 });
 
 router.post('/', disbursementController.createDisbursement);
-router.get('/', authMiddleware, disbursementController.getAllDisbursements);
+router.get('/', disbursementController.getAllDisbursements);
 router.get('/kitchen-store', authMiddleware, disbursementController.getKitchenStore);
 router.patch('/:id/status', authMiddleware, disbursementController.updateDisbursementStatus);
 
