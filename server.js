@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const { createServer } = require("http");
 const { Server } = require("socket.io");
-const WebSocket = require('ws');
+const WebSocket = require("ws");
 require("dotenv").config();
 
 const authRoutes = require("./src/routes/auth.js");
@@ -62,14 +62,14 @@ const io = new Server(server, {
       "http://localhost:5173",
       "http://localhost:3000",
       "https://ashokacrm.vercel.app",
-      "https://zomato-frontend-mocha.vercel.app"
+      "https://zomato-frontend-mocha.vercel.app",
     ],
-    methods: ["GET", "POST"]
-  }
+    methods: ["GET", "POST"],
+  },
 });
 
 // Make io available globally
-app.set('io', io);
+app.set("io", io);
 
 // Middleware
 const allowedOrigins = [
@@ -98,7 +98,7 @@ app.use(express.json({ limit: "50mb" }));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Apply pantry access restriction globally
-app.use('/api', restrictPantryAccess);
+app.use("/api", restrictPantryAccess);
 
 // Database connection
 let isConnected = false;
@@ -112,12 +112,12 @@ app.use(async (req, res, next) => {
         socketTimeoutMS: 45000,
       });
       isConnected = true;
-      console.log('MongoDB connected successfully');
+      console.log("MongoDB connected successfully");
     }
     next();
   } catch (error) {
-    console.error('Database connection failed:', error);
-    res.status(500).json({ error: 'Database connection failed' });
+    console.error("Database connection failed:", error);
+    res.status(500).json({ error: "Database connection failed" });
   }
 });
 
@@ -169,7 +169,6 @@ app.use("/api/pantry-categories", pantryCategoryRoutes);
 app.use("/api/kitchen-orders", kitchenOrderRoutes);
 app.use("/api/kitchen-store", kitchenStoreRoutes);
 
-
 // Health check endpoint
 app.get("/health", (req, res) => {
   res.json({
@@ -189,26 +188,26 @@ app.use((err, req, res, next) => {
 });
 
 // Socket.io connection handling (for existing features)
-io.on('connection', (socket) => {
-  socket.on('join-waiter-dashboard', () => {
-    socket.join('waiters');
+io.on("connection", (socket) => {
+  socket.on("join-waiter-dashboard", () => {
+    socket.join("waiters");
   });
 });
 
 // WebSocket server for Banquet
-const wss = new WebSocket.Server({ 
+const wss = new WebSocket.Server({
   server,
-  path: '/banquet-ws'
+  path: "/banquet-ws",
 });
 
-wss.on('connection', (ws) => {
-  console.log('WebSocket connected');
-  
-  ws.on('message', (message) => {
+wss.on("connection", (ws) => {
+  console.log("WebSocket connected");
+
+  ws.on("message", (message) => {
     try {
       const data = JSON.parse(message);
-      console.log('WebSocket message:', data.type);
-      
+      console.log("WebSocket message:", data.type);
+
       // Broadcast to all WebSocket clients
       wss.clients.forEach((client) => {
         if (client !== ws && client.readyState === WebSocket.OPEN) {
@@ -216,19 +215,21 @@ wss.on('connection', (ws) => {
         }
       });
     } catch (error) {
-      console.error('WebSocket message error:', error);
+      console.error("WebSocket message error:", error);
     }
   });
-  
-  ws.on('close', () => {
-    console.log('WebSocket disconnected');
+
+  ws.on("close", () => {
+    console.log("WebSocket disconnected");
   });
-  
+
   // Send welcome message
-  ws.send(JSON.stringify({
-    type: 'CONNECTION_ESTABLISHED',
-    message: 'Connected to Banquet WebSocket'
-  }));
+  ws.send(
+    JSON.stringify({
+      type: "CONNECTION_ESTABLISHED",
+      message: "Connected to Banquet WebSocket",
+    })
+  );
 });
 
 // For local development

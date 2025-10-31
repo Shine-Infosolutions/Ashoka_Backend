@@ -816,3 +816,48 @@ exports.updatePaymentStatus = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// Get vendor analytics
+exports.getVendorAnalytics = async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+    
+    if (!vendorId) {
+      return res.status(400).json({ error: 'Vendor ID is required' });
+    }
+
+    // Get all orders for this vendor
+    const vendorOrders = await PantryOrder.find({ vendorId })
+      .populate('orderedBy', 'username email')
+      .populate('vendorId', 'name phone email')
+      .populate('items.itemId', 'name unit')
+      .sort({ createdAt: -1 });
+
+    // Calculate analytics
+    const analytics = {
+      vendorId,
+      total: {
+        orders: vendorOrders.length,
+        amount: vendorOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0),
+        items: vendorOrders.reduce((sum, order) => sum + (order.items?.length || 0), 0)
+      },
+      statusBreakdown: {
+        pending: vendorOrders.filter(o => o.status === 'pending').length,
+        approved: vendorOrders.filter(o => o.status === 'approved').length,
+        fulfilled: vendorOrders.filter(o => o.status === 'fulfilled').length,
+        cancelled: vendorOrders.filter(o => o.status === 'cancelled').length
+      },
+      paymentBreakdown: {
+        paid: vendorOrders.filter(o => o.paymentStatus === 'paid').length,
+        pending: vendorOrders.filter(o => o.paymentStatus === 'pending').length,
+        partial: vendorOrders.filter(o => o.paymentStatus === 'partial').length
+      },
+      recentOrders: vendorOrders.slice(0, 10),
+      vendor: vendorOrders.length > 0 ? vendorOrders[0].vendorId : null
+    };
+
+    res.json({ success: true, analytics });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};

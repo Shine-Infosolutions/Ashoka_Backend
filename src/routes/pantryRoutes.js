@@ -132,6 +132,12 @@ router.get(
 );
 
 router.get(
+  "/vendor-analytics/:vendorId",
+  authMiddleware(["admin", "staff", "pantry"]),
+  pantryController.getVendorAnalytics
+);
+
+router.get(
   "/items/excel-report",
   authMiddleware(["admin", "staff"], ["pantry", "reception"]),
   pantryController.generatePantryItemsExcel
