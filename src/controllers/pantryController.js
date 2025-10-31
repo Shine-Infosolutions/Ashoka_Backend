@@ -89,6 +89,21 @@ exports.createPantryOrder = async (req, res) => {
       console.log('Index handling:', e.message);
     }
     
+    // Validate stock availability for Pantry to Kitchen orders
+    if (req.body.orderType === 'Pantry to Kitchen') {
+      for (const item of req.body.items) {
+        const pantryItem = await PantryItem.findById(item.itemId || item.pantryItemId);
+        if (!pantryItem) {
+          return res.status(404).json({ error: `Item ${item.itemId || item.pantryItemId} not found` });
+        }
+        if (pantryItem.stockQuantity < item.quantity) {
+          return res.status(400).json({ 
+            error: `Insufficient stock for ${pantryItem.name}. Available: ${pantryItem.stockQuantity}, Requested: ${item.quantity}` 
+          });
+        }
+      }
+    }
+
     const orderData = {
       ...req.body,
       orderedBy: req.user?.id || req.body.orderedBy
