@@ -73,6 +73,21 @@ const PantryOrderSchema = new mongoose.Schema(
       },
       notes: String,
     },
+    paymentStatus: {
+      type: String,
+      enum: ["pending", "paid", "partial"],
+      default: "pending",
+    },
+    paymentDetails: {
+      paidAmount: {
+        type: Number,
+        default: 0,
+      },
+      paidAt: Date,
+      paymentMethod: String,
+      transactionId: String,
+      notes: String,
+    },
   },
   { timestamps: true }
 );

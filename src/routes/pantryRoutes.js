@@ -65,10 +65,22 @@ router.post(
   pantryController.createPantryOrder
 );
 
+router.put(
+  "/orders/:id",
+  authMiddleware(["admin", "staff", "pantry"]),
+  pantryController.updatePantryOrder
+);
+
 router.patch(
   "/orders/:id/status",
   authMiddleware(["admin", "staff", "pantry"]),
   pantryController.updatePantryOrderStatus
+);
+
+router.patch(
+  "/orders/:orderId/payment-status",
+  authMiddleware(["admin", "staff", "pantry"]),
+  pantryController.updatePaymentStatus
 );
 
 router.delete(

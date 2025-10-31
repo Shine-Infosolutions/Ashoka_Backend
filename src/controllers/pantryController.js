@@ -216,6 +216,28 @@ exports.getPantryOrders = async (req, res) => {
   }
 };
 
+// Update pantry order
+exports.updatePantryOrder = async (req, res) => {
+  try {
+    const order = await PantryOrder.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+    });
+    
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    await order.populate([
+      { path: "orderedBy", select: "username email" },
+      { path: "vendorId", select: "name phone email" }
+    ]);
+
+    res.json({ success: true, order });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
 // Update pantry order status
 exports.updatePantryOrderStatus = async (req, res) => {
   try {
@@ -751,6 +773,45 @@ exports.getDisbursementHistory = async (req, res) => {
       .sort({ disbursedAt: -1 });
 
     res.json({ success: true, disbursements });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Update payment status for vendor orders
+exports.updatePaymentStatus = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { paymentStatus, paidAmount, paymentMethod, transactionId, notes } = req.body;
+
+    const order = await PantryOrder.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    // Only allow payment status updates for vendor orders
+    if (order.orderType !== 'Pantry to vendor') {
+      return res.status(400).json({ error: 'Payment status can only be updated for vendor orders' });
+    }
+
+    // Update payment status and details
+    order.paymentStatus = paymentStatus;
+    order.paymentDetails = {
+      paidAmount: paidAmount || 0,
+      paidAt: paymentStatus === 'paid' || paymentStatus === 'partial' ? new Date() : null,
+      paymentMethod: paymentMethod || '',
+      transactionId: transactionId || '',
+      notes: notes || ''
+    };
+
+    await order.save();
+
+    await order.populate([
+      { path: 'orderedBy', select: 'username email' },
+      { path: 'vendorId', select: 'name phone email' }
+    ]);
+
+    res.json({ success: true, order });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
