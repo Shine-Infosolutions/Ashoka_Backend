@@ -1,15 +1,24 @@
-// models/Laundry.js
 const mongoose = require("mongoose");
 
 const laundrySchema = new mongoose.Schema({
+  // 🧾 Basic Guest + Room Info
   grcNo: String,
   roomNumber: String,
-
   requestedByName: String, // Guest name
+
   bookingId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Booking',  
+    ref: "Booking",  
   },
+
+  // 🏢 Vendor Assignment
+  vendorId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "LaundryVendor",
+    required: true
+  },
+
+  // 🧺 Laundry Items
   items: [
     {
       rateId: { type: mongoose.Schema.Types.ObjectId, ref: "LaundryRate", required: true },
@@ -27,10 +36,12 @@ const laundrySchema = new mongoose.Schema({
     }
   ],
 
+  // ⚡ Urgency + Special Instructions
   isUrgent: { type: Boolean, default: false },
   urgencyNote: String,
   specialInstructions: String,
 
+  // 🧭 Laundry Process Status
   laundryStatus: {
     type: String,
     enum: ["pending", "in_progress", "partially_delivered", "completed", "cancelled"],
@@ -45,6 +56,7 @@ const laundrySchema = new mongoose.Schema({
   deliveredBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   receivedBy: String,
 
+  // 🧥 Damage / Loss Tracking
   damageReported: { type: Boolean, default: false },
   damageNotes: String,
   discardReason: String,
@@ -56,7 +68,7 @@ const laundrySchema = new mongoose.Schema({
   foundRemarks: String,
   lostDate: Date,
 
-  // Billing
+  // 💰 Billing
   isBillable: { type: Boolean, default: true }, 
   totalAmount: { type: Number, required: true },
   isComplimentary: { type: Boolean, default: false },
@@ -69,9 +81,16 @@ const laundrySchema = new mongoose.Schema({
   isReturned: { type: Boolean, default: false },
   isCancelled: { type: Boolean, default: false },
 
+  // 📞 Vendor Communication
+  vendorOrderId: String, // vendor's internal order ID
+  vendorNotes: String,
+  vendorPickupTime: Date,
+  vendorDeliveryTime: Date
+
 }, { timestamps: true });
 
-// Auto-calc total + itemName
+
+// 🧮 Auto-calc total + auto-fill item name from LaundryRate
 laundrySchema.pre("save", async function (next) {
   if (this.items?.length) {
     let total = 0;
@@ -89,6 +108,12 @@ laundrySchema.pre("save", async function (next) {
     }
     this.totalAmount = total;
   }
+  next();
+});
+
+// Populate vendor details
+laundrySchema.pre(/^find/, function(next) {
+  this.populate('vendorId', 'vendorName vendorType phoneNumber');
   next();
 });
 
