@@ -14,8 +14,7 @@ const laundrySchema = new mongoose.Schema({
   // 🏢 Vendor Assignment
   vendorId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "LaundryVendor",
-    required: true
+    ref: "LaundryVendor"
   },
 
   // 🧺 Laundry Items

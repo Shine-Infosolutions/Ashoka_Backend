@@ -59,9 +59,7 @@ exports.createLaundryOrder = async (req, res) => {
       return res.status(400).json({ error: "Booking ID is required" });
     }
 
-    if (!vendorId) {
-      return res.status(400).json({ error: "Vendor ID is required" });
-    }
+
 
     // Calculate total using helper
     const { processedItems: laundryItems, total: totalAmount } = await calculateItems(items);
