@@ -35,8 +35,11 @@ router.patch("/cancel/:id", laundryController.cancelLaundryOrder);
 // Mark laundry returned
 router.patch("/return/:id", laundryController.markLaundryReturned);
 
-// Report damage or loss
-router.post("/loss/:id", laundryController.reportDamageOrLoss);
+// Report damage or loss for specific items
+router.post("/loss/:laundryId/:itemId", laundryController.reportDamageOrLoss);
+
+// Get damage and loss reports by date and room
+router.get("/damage-loss-reports", laundryController.getDamageAndLossReports);
 
 // Delete laundry order
 router.delete("/:id", authMiddleware(["admin"], ["laundry"]), laundryController.deleteLaundry);

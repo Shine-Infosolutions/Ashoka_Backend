@@ -1,6 +1,7 @@
 // controllers/laundryController.js
 const Laundry = require("../models/Laundry");
 const LaundryRate = require("../models/LaundryRate");
+
 const Booking = require("../models/Booking");
 const Invoice = require("../models/Invoice");
 
@@ -42,44 +43,39 @@ const calculateItems = async (items) => {
   return { processedItems, total };
 };
 
-// 🔹 Create Laundry Order
+// 🔹 Create Integrated Laundry Order
 exports.createLaundryOrder = async (req, res) => {
   try {
-    const { bookingId, items, urgent, grcNo, roomNumber, requestedByName, receivedBy } = req.body;
+    const { 
+      bookingId, items, urgent, grcNo, roomNumber, 
+      requestedByName, receivedBy, vendorId 
+    } = req.body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: "Items are required" });
     }
 
-    // Calculate total
-    let totalAmount = 0;
-    const laundryItems = [];
-
-    for (const item of items) {
-      const rate = await LaundryRate.findById(item.rateId);
-      if (!rate) {
-        return res.status(404).json({ error: "Invalid laundry rate" });
-      }
-      const calculatedAmount = rate.rate * item.quantity;
-      totalAmount += calculatedAmount;
-
-      laundryItems.push({
-        itemName: rate.itemName,
-        rateId: rate._id,
-        quantity: item.quantity,
-        calculatedAmount,
-      });
+    if (!bookingId) {
+      return res.status(400).json({ error: "Booking ID is required" });
     }
 
-    // ✅ Save Laundry order with extra fields
+    if (!vendorId) {
+      return res.status(400).json({ error: "Vendor ID is required" });
+    }
+
+    // Calculate total using helper
+    const { processedItems: laundryItems, total: totalAmount } = await calculateItems(items);
+
+    // ✅ Save Integrated Laundry order
     const laundryOrder = await Laundry.create({
       bookingId,
+      vendorId,
       grcNo,
       roomNumber,
       requestedByName,
       items: laundryItems,
       totalAmount,
-      isUrgent: urgent || false, // ⚡ field ka naam match karo model se
+      isUrgent: urgent || false,
       billStatus: "unpaid",
     });
 
@@ -317,20 +313,92 @@ exports.markLaundryReturned = async (req, res) => {
   }
 };
 
-// — Report Damage/Loss
+// — Report Damage/Loss for specific items
 exports.reportDamageOrLoss = async (req, res) => {
   try {
+    const { laundryId, itemId } = req.params;
     const { damageReported, damageNotes, isLost, lossNote } = req.body;
-    const order = await Laundry.findById(req.params.id);
+    
+    const order = await Laundry.findById(laundryId).populate("bookingId", "roomNumber");
     if (!order) return res.status(404).json({ message: "Order not found" });
 
-    if (typeof damageReported !== "undefined") order.damageReported = damageReported;
-    if (damageNotes) order.damageNotes = damageNotes;
-    if (typeof isLost !== "undefined") order.isLost = isLost;
-    if (lossNote) order.lossNote = lossNote;
+    const item = order.items.id(itemId);
+    if (!item) return res.status(404).json({ message: "Item not found" });
+
+    // Update item-specific damage/loss
+    if (typeof damageReported !== "undefined") {
+      item.damageReported = damageReported;
+      if (damageReported && damageNotes) item.itemNotes = damageNotes;
+    }
+
+    // Update order-level loss tracking
+    if (typeof isLost !== "undefined") {
+      order.isLost = isLost;
+      if (isLost) {
+        order.lostDate = new Date();
+        if (lossNote) order.lossNote = lossNote;
+      }
+    }
 
     await order.save();
-    res.json(order);
+    res.json({ message: "Damage/Loss reported successfully", order });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// — Get Damage/Loss Reports by Date and Room
+exports.getDamageAndLossReports = async (req, res) => {
+  try {
+    const { startDate, endDate, roomNumber } = req.query;
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({ message: "Please provide startDate and endDate" });
+    }
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+
+    const query = {
+      createdAt: { $gte: start, $lte: end },
+      $or: [
+        { "items.damageReported": true },
+        { isLost: true }
+      ]
+    };
+
+    if (roomNumber) {
+      query.roomNumber = roomNumber;
+    }
+
+    const reports = await Laundry.find(query)
+      .populate("bookingId", "guestName roomNumber")
+      .populate("items.rateId", "itemName rate")
+      .sort({ createdAt: -1 });
+
+    // Format response to show damaged/lost items clearly
+    const formattedReports = reports.map(order => ({
+      orderId: order._id,
+      roomNumber: order.roomNumber || order.bookingId?.roomNumber,
+      guestName: order.bookingId?.guestName,
+      date: order.createdAt,
+      lostDate: order.lostDate,
+      isLost: order.isLost,
+      lossNote: order.lossNote,
+      damagedItems: order.items.filter(item => item.damageReported).map(item => ({
+        itemId: item._id,
+        itemName: item.itemName,
+        quantity: item.quantity,
+        notes: item.itemNotes
+      })),
+      totalDamagedItems: order.items.filter(item => item.damageReported).length
+    }));
+
+    res.json({
+      totalReports: formattedReports.length,
+      reports: formattedReports
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -388,3 +456,5 @@ exports.deleteLaundry = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+

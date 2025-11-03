@@ -7,6 +7,13 @@ const laundryRateSchema = new mongoose.Schema({
   itemName: { type: String, required: true },
   rate: { type: Number, required: true },
   unit: { type: String, enum: ["piece", "pair", "set"], default: "piece" },
+  
+  // Vendor-specific rates
+  vendorId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "LaundryVendor"
+  },
+  
   isActive: { type: Boolean, default: true }
 }, { timestamps: true });
 
