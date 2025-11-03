@@ -29,7 +29,11 @@ exports.register = async (req, res) => {
       role,
       department,
       restaurantRole,
-      salary,
+      validId,
+      phoneNumber,
+      photo,
+      bankDetails,
+      salaryDetails
     } = req.body;
 
     if (!email || !username || !password || !role) {
@@ -64,6 +68,12 @@ exports.register = async (req, res) => {
 
     if (role === "staff") {
       userData.department = normalizeDepartment(department);
+      // Add staff-specific fields
+      if (validId) userData.validId = validId;
+      if (phoneNumber) userData.phoneNumber = phoneNumber;
+      if (photo) userData.photo = photo;
+      if (bankDetails) userData.bankDetails = bankDetails;
+      if (salaryDetails) userData.salaryDetails = salaryDetails;
     } else if (role === "admin") {
       userData.department = [
         { id: 1, name: "kitchen" },
