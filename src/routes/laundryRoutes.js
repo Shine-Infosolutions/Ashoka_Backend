@@ -17,6 +17,9 @@ router.get("/filter-by-date", laundryController.filterLaundryByDate);
 // Get damage and loss reports by date and room
 router.get("/damage-loss-reports", laundryController.getDamageAndLossReports);
 
+// Get all loss reports
+router.get("/loss-reports", laundryController.getAllLossReports);
+
 // Get laundry order by ID (placed after specific routes to avoid conflicts)
 router.get("/:id", laundryController.getLaundryById);
 
@@ -42,7 +45,10 @@ router.patch("/return/:id", laundryController.markLaundryReturned);
 router.get("/loss-items/:laundryId", laundryController.getLaundryOrderItems);
 
 // Report damage or loss for specific items
-router.post("/loss/:laundryId/:itemId", laundryController.reportDamageOrLoss);
+router.post("/damage-loss/:laundryId/:itemId", laundryController.reportDamageOrLoss);
+
+// Create loss report
+router.post("/loss-report", laundryController.createLossReport);
 
 // Delete laundry order
 router.delete("/:id", authMiddleware(["admin"], ["laundry"]), laundryController.deleteLaundry);

@@ -43,7 +43,7 @@ const laundrySchema = new mongoose.Schema({
   // 🧭 Laundry Process Status
   laundryStatus: {
     type: String,
-    enum: ["pending", "in_progress", "partially_delivered", "completed", "cancelled"],
+    enum: ["pending", "picked_up", "ready", "delivered", "cancelled"],
     default: "pending",
   },
 
@@ -112,7 +112,7 @@ laundrySchema.pre("save", async function (next) {
 
 // Populate vendor details
 laundrySchema.pre(/^find/, function(next) {
-  this.populate('vendorId', 'vendorName vendorType phoneNumber');
+  this.populate('vendorId', 'vendorName vendorType phoneNumber UpiID');
   next();
 });
 

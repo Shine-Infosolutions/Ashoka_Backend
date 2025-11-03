@@ -13,8 +13,7 @@ const invoiceSchema = new mongoose.Schema({
   },
   bookingId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Booking',
-    required: true  
+    ref: 'Booking'
   },  
   invoiceNumber: {
     type: String,
