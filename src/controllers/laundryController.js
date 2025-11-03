@@ -311,6 +311,41 @@ exports.markLaundryReturned = async (req, res) => {
   }
 };
 
+// — Get Laundry Order Items for Loss Reporting
+exports.getLaundryOrderItems = async (req, res) => {
+  try {
+    const { laundryId } = req.params;
+    
+    const order = await Laundry.findById(laundryId)
+      .populate("bookingId", "guestName roomNumber")
+      .populate("items.rateId", "itemName rate");
+    
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    // Format items for loss reporting UI
+    const formattedItems = order.items.map(item => ({
+      itemId: item._id,
+      itemName: item.itemName,
+      quantity: item.quantity,
+      status: item.status,
+      damageReported: item.damageReported || false,
+      itemNotes: item.itemNotes || "",
+      calculatedAmount: item.calculatedAmount
+    }));
+
+    res.json({
+      orderId: order._id,
+      roomNumber: order.roomNumber || order.bookingId?.roomNumber,
+      guestName: order.bookingId?.guestName,
+      orderDate: order.createdAt,
+      items: formattedItems,
+      totalItems: formattedItems.length
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // — Report Damage/Loss for specific items
 exports.reportDamageOrLoss = async (req, res) => {
   try {
