@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const payrollSchema = new mongoose.Schema({
   staffId: { 
     type: mongoose.Schema.Types.ObjectId, 
-    ref: 'Staff', 
+    ref: 'User', 
     required: true 
   },
   month: { type: Number, required: true }, // 1-12

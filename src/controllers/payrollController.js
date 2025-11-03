@@ -1,6 +1,6 @@
 const Attendance = require('../models/Attendance');
 const Payroll = require('../models/Payroll');
-const Staff = require('../models/Staff');
+const User = require('../models/User');
 
 exports.generatePayroll = async (req, res) => {
   try {
@@ -10,10 +10,10 @@ exports.generatePayroll = async (req, res) => {
     if (!month || month < 1 || month > 12) return res.status(400).json({ message: 'Invalid month' });
     if (!year || year < 2000) return res.status(400).json({ message: 'Invalid year' });
 
-    const staff = await Staff.findById(staffId).populate('userId', 'username email role');
-    if (!staff) return res.status(404).json({ message: 'Staff not found' });
+    const staff = await User.findById(staffId);
+    if (!staff || staff.role !== 'staff') return res.status(404).json({ message: 'Staff not found' });
 
-    const monthlySalary = staff.salary;
+    const monthlySalary = staff.salaryDetails?.basicSalary || 0;
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 1);
 

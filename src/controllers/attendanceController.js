@@ -1,5 +1,5 @@
 const Attendance = require('../models/Attendance');
-const Staff = require('../models/Staff');
+const User = require('../models/User');
 
 // Utility: check if a date is Sunday
 const isSunday = (date) => new Date(date).getDay() === 0;
@@ -43,8 +43,8 @@ exports.markAttendance = async (req, res) => {
     let { staffId, date, status, leaveType, checkIn, checkOut, remarks } = req.body;
     if (!staffId) return res.status(400).json({ message: 'staffId is required' });
 
-    const staff = await Staff.findById(staffId).populate('userId', 'role');
-    if (!staff || !staff.userId || staff.userId.role !== 'staff')
+    const staff = await User.findById(staffId);
+    if (!staff || staff.role !== 'staff')
       return res.status(404).json({ message: 'Staff not found/invalid' });
 
     let d = new Date(date); d.setHours(0, 0, 0, 0);
@@ -101,8 +101,8 @@ exports.getAttendance = async (req, res) => {
     const { staffId, date } = req.query;
     let filter = {};
     if (staffId) {
-      const staff = await Staff.findById(staffId).populate('userId', 'role');
-      if (!staff) return res.status(404).json({ message: 'Staff not found' });
+      const staff = await User.findById(staffId);
+      if (!staff || staff.role !== 'staff') return res.status(404).json({ message: 'Staff not found' });
       filter.staffId = staff._id;
     }
     if (date) {
@@ -110,7 +110,7 @@ exports.getAttendance = async (req, res) => {
       filter.date = { $gte: start, $lt: end };
     }
     const records = await Attendance.find(filter)
-      .populate({ path: 'staffId', populate: { path: 'userId', select: 'username email role' } });
+      .populate('staffId', 'username email role');
     res.json(records);
 
   } catch (error) {
@@ -125,7 +125,7 @@ exports.getAttendance = async (req, res) => {
 exports.getAllAttendance = async (req, res) => {
   try {
     const records = await Attendance.find().sort({ date: -1 })
-      .populate({ path: 'staffId', populate: { path: 'userId', select: 'username email role' } });
+      .populate('staffId', 'username email role');
     res.json(records);
   } catch (error) {
     console.error(error);

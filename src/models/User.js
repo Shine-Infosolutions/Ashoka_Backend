@@ -10,6 +10,29 @@ const userSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.Mixed, // can be string or array
     required: false
   },
+  
+  // Staff Details (for admin registering staff)
+  validId: { 
+    type: String, 
+    enum: ['aadhar', 'pan', 'passport', 'driving_license', 'voter_id']
+  }, // ID proof type
+  phoneNumber: { type: String },
+  photo: { type: String }, // photo URL/path
+  
+  // Bank Details
+  bankDetails: {
+    accountNumber: String,
+    ifscCode: String,
+    bankName: String,
+    accountHolderName: String
+  },
+  
+  // Salary Details
+  salaryDetails: {
+    basicSalary: Number,
+    allowances: Number,
+    deductions: Number,
+    netSalary: Number}
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);

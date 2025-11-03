@@ -44,7 +44,7 @@ const dashboardRoutes = require("./src/routes/dashboardRoutes.js");
 const wastageRoutes = require("./src/routes/wastageRoutes.js");
 const attendanceRoutes = require("./src/routes/attendanceRoutes.js");
 const payrollRoutes = require("./src/routes/payrollRoutes.js");
-const staffRoutes = require("./src/routes/staffRoutes.js");
+
 const vendorRoutes = require("./src/routes/vendorRoutes.js");
 const roomInspectionRoutes = require("./src/routes/roomInspectionRoutes.js");
 const pantryCategoryRoutes = require("./src/routes/pantryCategoryRoutes.js");
@@ -163,7 +163,7 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/wastage", wastageRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/payroll", payrollRoutes);
-app.use("/api/staff", staffRoutes);
+
 app.use("/api/vendor", vendorRoutes);
 app.use("/api/room-inspections", roomInspectionRoutes);
 app.use("/api/pantry-categories", pantryCategoryRoutes);
