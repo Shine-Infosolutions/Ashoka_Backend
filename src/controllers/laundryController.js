@@ -350,21 +350,21 @@ exports.getDamageAndLossReports = async (req, res) => {
   try {
     const { startDate, endDate, roomNumber } = req.query;
     
-    if (!startDate || !endDate) {
-      return res.status(400).json({ message: "Please provide startDate and endDate" });
+    // If no date filters provided, return all reports
+    let query = {};
+    
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      query.createdAt = { $gte: start, $lte: end };
     }
 
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    end.setHours(23, 59, 59, 999);
-
-    const query = {
-      createdAt: { $gte: start, $lte: end },
-      $or: [
-        { "items.damageReported": true },
-        { isLost: true }
-      ]
-    };
+    // Add damage/loss filter
+    query.$or = [
+      { "items.damageReported": true },
+      { isLost: true }
+    ];
 
     if (roomNumber) {
       query.roomNumber = roomNumber;
