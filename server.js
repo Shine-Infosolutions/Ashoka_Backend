@@ -44,7 +44,7 @@ const dashboardRoutes = require("./src/routes/dashboardRoutes.js");
 const wastageRoutes = require("./src/routes/wastageRoutes.js");
 const attendanceRoutes = require("./src/routes/attendanceRoutes.js");
 const payrollRoutes = require("./src/routes/payrollRoutes.js");
-
+const salaryRoutes = require("./src/routes/salaryRoutes.js");
 const vendorRoutes = require("./src/routes/vendorRoutes.js");
 const roomInspectionRoutes = require("./src/routes/roomInspectionRoutes.js");
 const pantryCategoryRoutes = require("./src/routes/pantryCategoryRoutes.js");
@@ -170,6 +170,7 @@ app.use("/api/pantry-categories", pantryCategoryRoutes);
 app.use("/api/kitchen-orders", kitchenOrderRoutes);
 app.use("/api/kitchen-store", kitchenStoreRoutes);
 app.use("/api/laundry-vendors", laundryVendorRoutes);
+app.use("/api/salary", salaryRoutes);
 
 // Health check endpoint
 app.get("/health", (req, res) => {

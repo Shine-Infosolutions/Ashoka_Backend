@@ -2,12 +2,23 @@ const express = require('express');
 const router = express.Router();
 const attendanceController = require('../controllers/attendanceController');
 
-// Mark or update attendance
+// Clock in/out
+router.post('/clock-in', attendanceController.clockIn);
+router.post('/clock-out', attendanceController.clockOut);
+
+// Manual attendance marking (admin)
 router.post('/mark', attendanceController.markAttendance);
 
-// Get attendance by user or date
+// Get attendance
 router.get('/get', attendanceController.getAttendance);
 router.get('/all', attendanceController.getAllAttendance);
-router.patch('/status', attendanceController.updateAttendanceStatus);
+router.get('/today/:staffId', attendanceController.getTodayAttendance);
+
+// Staff Dashboard
+router.get('/dashboard/:staffId', attendanceController.getStaffDashboard);
+router.get('/monthly-report/:staffId', attendanceController.getMonthlyReport);
+
+// Update attendance
+router.patch('/update', attendanceController.updateAttendance);
 
 module.exports = router;
