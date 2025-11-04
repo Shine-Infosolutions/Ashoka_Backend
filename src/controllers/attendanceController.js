@@ -1,12 +1,12 @@
 const Attendance = require('../models/Attendance');
 const User = require('../models/User');
 
-// Utility: returns start/end of day
+// Utility: returns start/end of day in UTC
 const getDayRange = (date) => {
   let d = new Date(date);
-  d.setHours(0, 0, 0, 0);
+  d.setUTCHours(0, 0, 0, 0);
   let next = new Date(d);
-  next.setDate(next.getDate() + 1);
+  next.setUTCDate(next.getUTCDate() + 1);
   return {start: d, end: next};
 };
 
@@ -22,7 +22,8 @@ exports.clockIn = async (req, res) => {
     if (!staff || staff.role !== 'staff')
       return res.status(404).json({ message: 'Staff not found/invalid' });
 
-    const today = new Date().setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
     const existing = await Attendance.findOne({ staffId, date: today });
     
     if (existing) {
@@ -55,7 +56,8 @@ exports.clockOut = async (req, res) => {
     const { staffId, is_manual_checkout = false, notes } = req.body;
     if (!staffId) return res.status(400).json({ message: 'staffId is required' });
 
-    const today = new Date().setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
     const attendance = await Attendance.findOne({ staffId, date: today });
     
     if (!attendance) {
@@ -110,7 +112,8 @@ exports.markAttendance = async (req, res) => {
       return res.status(400).json({ message: 'time_in is required for non-leave attendance' });
     }
 
-    const attendanceDate = date ? new Date(date).setHours(0, 0, 0, 0) : new Date().setHours(0, 0, 0, 0);
+    const attendanceDate = new Date(date || new Date());
+    attendanceDate.setUTCHours(0, 0, 0, 0);
     
     const attendance = new Attendance({
       staffId,
@@ -149,10 +152,11 @@ exports.getAttendance = async (req, res) => {
       let {start, end} = getDayRange(date);
       filter.date = { $gte: start, $lt: end };
     } else if (startDate && endDate) {
-      filter.date = { 
-        $gte: new Date(startDate).setHours(0, 0, 0, 0),
-        $lte: new Date(endDate).setHours(23, 59, 59, 999)
-      };
+      const start = new Date(startDate);
+      start.setUTCHours(0, 0, 0, 0);
+      const end = new Date(endDate);
+      end.setUTCHours(23, 59, 59, 999);
+      filter.date = { $gte: start, $lte: end };
     }
     
     const records = await Attendance.find(filter)
@@ -238,7 +242,8 @@ exports.updateAttendance = async (req, res) => {
 exports.getTodayAttendance = async (req, res) => {
   try {
     const { staffId } = req.params;
-    const today = new Date().setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
     
     const attendance = await Attendance.findOne({ staffId, date: today })
       .populate('staffId', 'username email role');
@@ -254,7 +259,8 @@ exports.getTodayAttendance = async (req, res) => {
 exports.getStaffDashboard = async (req, res) => {
   try {
     const { staffId } = req.params;
-    const today = new Date().setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     const endOfMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0, 23, 59, 59, 999);
 
