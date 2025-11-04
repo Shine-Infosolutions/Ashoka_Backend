@@ -76,13 +76,12 @@ exports.register = async (req, res) => {
       if (salaryDetails) userData.salaryDetails = salaryDetails;
     } else if (role === "admin") {
       userData.department = [
-        { id: 1, name: "kitchen" },
-        { id: 2, name: "laundry" },
-        { id: 3, name: "reception" },
-        { id: 4, name: "maintenance" },
-        { id: 5, name: "other" },
-        { id: 6, name: "housekeeping" },
-        { id: 7, name: "pantry" },
+        { id: 1, name: "laundry" },
+        { id: 2, name: "reception" },
+        { id: 3, name: "maintenance" },
+        { id: 4, name: "other" },
+        { id: 5, name: "housekeeping" },
+        { id: 6, name: "pantry" },
       ];
     } else if (role === "restaurant") {
       userData.restaurantRole = restaurantRole;
