@@ -36,6 +36,8 @@ exports.clockIn = async (req, res) => {
     const checkInHour = now.getHours();
     const checkInMinute = now.getMinutes();
     
+    console.log(`Check-in time: ${checkInHour}:${checkInMinute}, Shift: ${shift}`); // Debug
+    
     // Use the shift selected by staff in UI
     const actualShift = shift;
     
@@ -46,6 +48,7 @@ exports.clockIn = async (req, res) => {
       if (checkInHour > 10 || (checkInHour === 10 && checkInMinute > 0)) {
         status = 'Late';
       }
+      console.log(`Morning shift logic: ${checkInHour}:${checkInMinute} -> ${status}`);
     } else if (shift === 'evening') {
       // Evening shift: 4:00 PM - 10 PM
       // Present if check-in at or before 4:00 PM, Late if after 4:00 PM
@@ -54,6 +57,7 @@ exports.clockIn = async (req, res) => {
       } else {
         status = 'Present'; // Check-in at or before 4:00 PM is on time
       }
+      console.log(`Evening shift logic: ${checkInHour}:${checkInMinute} -> ${status}`);
     }
     
     const attendance = new Attendance({
