@@ -31,11 +31,20 @@ exports.clockIn = async (req, res) => {
     }
 
     const now = new Date();
+    const checkInHour = now.getHours();
+    const checkInMinute = now.getMinutes();
+    
+    // Check-in before 9:00 AM = Present, after 9:00 AM = Late
+    let status = 'Present';
+    if (checkInHour > 9 || (checkInHour === 9 && checkInMinute > 0)) {
+      status = 'Late';
+    }
+    
     const attendance = new Attendance({
       staffId,
       date: today,
       time_in: now,
-      status: now.getHours() > 9 ? 'Late' : 'Present',
+      status: status,
       notes
     });
 
@@ -68,7 +77,8 @@ exports.clockOut = async (req, res) => {
       return res.status(400).json({ message: 'Already clocked out today' });
     }
 
-    attendance.time_out = new Date();
+    const checkOutTime = new Date();
+    attendance.time_out = checkOutTime;
     attendance.is_manual_checkout = is_manual_checkout;
     if (notes) attendance.notes = notes;
 
@@ -76,9 +86,25 @@ exports.clockOut = async (req, res) => {
     const hoursWorked = (attendance.time_out - attendance.time_in) / (1000 * 60 * 60);
     attendance.total_hours = hoursWorked;
     
-    // Auto-determine status based on hours worked
-    if (hoursWorked < 4) {
-      attendance.status = 'Half Day';
+    const checkOutHour = checkOutTime.getHours();
+    const checkOutMinute = checkOutTime.getMinutes();
+    
+    // Determine final status based on checkout time and hours worked
+    // Full working hours: 9 AM to 6 PM (9 hours)
+    if (checkOutHour < 18 || (checkOutHour === 18 && checkOutMinute === 0)) {
+      // If checkout before 6 PM, check if it's half day
+      if (hoursWorked < 4.5) {
+        attendance.status = 'Half Day';
+      } else if (checkOutHour >= 18) {
+        // If worked more than 4.5 hours and checkout at/after 6 PM
+        attendance.status = attendance.status === 'Late' ? 'Late' : 'Present';
+      } else {
+        // Checkout before 6 PM but worked decent hours
+        attendance.status = 'Half Day';
+      }
+    } else {
+      // Checkout after 6 PM - full day completed
+      attendance.status = attendance.status === 'Late' ? 'Late' : 'Present';
     }
 
     await attendance.save();
