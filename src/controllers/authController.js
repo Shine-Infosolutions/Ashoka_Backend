@@ -159,6 +159,11 @@ exports.getStaffProfile = async (req, res) => {
 
     if (user.role === "staff") {
       responseData.departments = user.department;
+      responseData.salaryDetails = user.salaryDetails;
+      responseData.bankDetails = user.bankDetails;
+      responseData.phoneNumber = user.phoneNumber;
+      responseData.validId = user.validId;
+      responseData.photo = user.photo;
     } else if (user.role === "admin") {
       responseData.departments = user.department;
       responseData.isAdmin = true;

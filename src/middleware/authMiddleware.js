@@ -72,12 +72,17 @@ function restrictPantryAccess(req, res, next) {
         '/api/vendor',
         '/api/inventory',
         '/api/purchase-orders',
+        '/api/attendance',
+        '/api/housekeeping/tasks',
+        '/api/auth',
+        '/api/salary',
         '/pantry', 
         '/pantry-categories', 
         '/dashboard', 
         '/vendor',
         '/inventory',
-        '/purchase-orders'
+        '/purchase-orders',
+        '/attendance'
       ];
       const isAllowed = allowedPaths.some(path => req.path.startsWith(path));
       
