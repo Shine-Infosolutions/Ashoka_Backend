@@ -15,8 +15,10 @@ const getDayRange = (date) => {
  */
 exports.clockIn = async (req, res) => {
   try {
-    const { staffId, notes } = req.body;
+    const { staffId, notes, shift } = req.body;
+    console.log('Clock-in request body:', req.body); // Debug log
     if (!staffId) return res.status(400).json({ message: 'staffId is required' });
+    if (!shift) return res.status(400).json({ message: 'shift is required' });
 
     const staff = await User.findById(staffId);
     if (!staff)
@@ -34,16 +36,28 @@ exports.clockIn = async (req, res) => {
     const checkInHour = now.getHours();
     const checkInMinute = now.getMinutes();
     
-    // Check-in before 9:00 AM = Present, after 9:00 AM = Late
+    // Use the shift selected by staff in UI
+    const actualShift = shift;
+    
+    // Shift-based timing rules based on UI selection
     let status = 'Present';
-    if (checkInHour > 9 || (checkInHour === 9 && checkInMinute > 0)) {
-      status = 'Late';
+    if (shift === 'morning') {
+      // Morning shift: 10 AM - 4 PM (6 hours)
+      if (checkInHour > 10 || (checkInHour === 10 && checkInMinute > 0)) {
+        status = 'Late';
+      }
+    } else if (shift === 'evening') {
+      // Evening shift: 4:00 PM - 10 PM
+      if (checkInHour > 16 || (checkInHour === 16 && checkInMinute > 0)) {
+        status = 'Late';
+      }
     }
     
     const attendance = new Attendance({
       staffId,
       date: today,
       time_in: now,
+      shift: shift,
       status: status,
       notes
     });
@@ -89,22 +103,44 @@ exports.clockOut = async (req, res) => {
     const checkOutHour = checkOutTime.getHours();
     const checkOutMinute = checkOutTime.getMinutes();
     
-    // Determine final status based on checkout time and hours worked
-    // Full working hours: 9 AM to 6 PM (9 hours)
-    if (checkOutHour < 18 || (checkOutHour === 18 && checkOutMinute === 0)) {
-      // If checkout before 6 PM, check if it's half day
-      if (hoursWorked < 4.5) {
-        attendance.status = 'Half Day';
-      } else if (checkOutHour >= 18) {
-        // If worked more than 4.5 hours and checkout at/after 6 PM
-        attendance.status = attendance.status === 'Late' ? 'Late' : 'Present';
+    // Shift-based checkout validation (handle missing shift field)
+    const attendanceShift = attendance.shift || 'morning'; // Default to morning for old records
+    
+    if (attendanceShift === 'morning') {
+      // Morning shift: 10 AM - 4 PM (6 hours)
+      if (checkOutHour < 16 || (checkOutHour === 16 && checkOutMinute === 0)) {
+        if (hoursWorked < 3) {
+          attendance.status = 'Half Day';
+        } else if (checkOutHour >= 16) {
+          // Full shift completed
+          attendance.status = attendance.status === 'Late' ? 'Late' : 'Present';
+        } else {
+          attendance.status = 'Half Day';
+        }
       } else {
-        // Checkout before 6 PM but worked decent hours
-        attendance.status = 'Half Day';
+        // Checkout after 4 PM - full shift completed
+        attendance.status = attendance.status === 'Late' ? 'Late' : 'Present';
       }
     } else {
-      // Checkout after 6 PM - full day completed
-      attendance.status = attendance.status === 'Late' ? 'Late' : 'Present';
+      // Evening shift: 5:08 PM - 10 PM (testing)
+      if (checkOutHour < 22 || (checkOutHour === 22 && checkOutMinute === 0)) {
+        if (hoursWorked < 3) {
+          attendance.status = 'Half Day';
+        } else if (checkOutHour >= 22) {
+          // Full shift completed
+          attendance.status = attendance.status === 'Late' ? 'Late' : 'Present';
+        } else {
+          attendance.status = 'Half Day';
+        }
+      } else {
+        // Checkout after 10 PM - full shift completed
+        attendance.status = attendance.status === 'Late' ? 'Late' : 'Present';
+      }
+    }
+    
+    // Ensure shift is set for old records
+    if (!attendance.shift) {
+      attendance.shift = attendanceShift;
     }
 
     await attendance.save();
