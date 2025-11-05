@@ -33,10 +33,12 @@ exports.clockIn = async (req, res) => {
     }
 
     const now = new Date();
-    const checkInHour = now.getHours();
-    const checkInMinute = now.getMinutes();
+    // Convert to IST (UTC+5:30)
+    const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+    const checkInHour = istTime.getHours();
+    const checkInMinute = istTime.getMinutes();
     
-    console.log(`Check-in time: ${checkInHour}:${checkInMinute}, Shift: ${shift}`); // Debug
+    console.log(`Check-in time (IST): ${checkInHour}:${checkInMinute}, Shift: ${shift}`); // Debug
     
     // Use the shift selected by staff in UI
     const actualShift = shift;
@@ -107,8 +109,10 @@ exports.clockOut = async (req, res) => {
     const hoursWorked = (attendance.time_out - attendance.time_in) / (1000 * 60 * 60);
     attendance.total_hours = hoursWorked;
     
-    const checkOutHour = checkOutTime.getHours();
-    const checkOutMinute = checkOutTime.getMinutes();
+    // Convert to IST for checkout time comparison
+    const istCheckOutTime = new Date(checkOutTime.getTime() + (5.5 * 60 * 60 * 1000));
+    const checkOutHour = istCheckOutTime.getHours();
+    const checkOutMinute = istCheckOutTime.getMinutes();
     
     // Shift-based checkout validation (handle missing shift field)
     const attendanceShift = attendance.shift || 'morning'; // Default to morning for old records
