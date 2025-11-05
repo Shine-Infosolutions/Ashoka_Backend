@@ -19,7 +19,7 @@ exports.clockIn = async (req, res) => {
     if (!staffId) return res.status(400).json({ message: 'staffId is required' });
 
     const staff = await User.findById(staffId);
-    if (!staff || staff.role !== 'staff')
+    if (!staff)
       return res.status(404).json({ message: 'Staff not found/invalid' });
 
     const today = new Date();
@@ -96,7 +96,7 @@ exports.markAttendance = async (req, res) => {
     if (!staffId) return res.status(400).json({ message: 'staffId is required' });
 
     const staff = await User.findById(staffId);
-    if (!staff || staff.role !== 'staff')
+    if (!staff)
       return res.status(404).json({ message: 'Staff not found/invalid' });
 
     const validStatus = ['Present', 'Absent', 'Half Day', 'Late', 'Leave'];
@@ -144,7 +144,7 @@ exports.getAttendance = async (req, res) => {
     
     if (staffId) {
       const staff = await User.findById(staffId);
-      if (!staff || staff.role !== 'staff') return res.status(404).json({ message: 'Staff not found' });
+      if (!staff) return res.status(404).json({ message: 'Staff not found' });
       filter.staffId = staff._id;
     }
     
