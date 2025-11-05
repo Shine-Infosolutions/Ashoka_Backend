@@ -72,8 +72,11 @@ exports.clockOut = async (req, res) => {
     attendance.is_manual_checkout = is_manual_checkout;
     if (notes) attendance.notes = notes;
 
-    // Auto-determine status based on hours worked
+    // Calculate total hours worked
     const hoursWorked = (attendance.time_out - attendance.time_in) / (1000 * 60 * 60);
+    attendance.total_hours = hoursWorked;
+    
+    // Auto-determine status based on hours worked
     if (hoursWorked < 4) {
       attendance.status = 'Half Day';
     }
