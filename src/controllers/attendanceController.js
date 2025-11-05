@@ -48,14 +48,11 @@ exports.clockIn = async (req, res) => {
       }
     } else if (shift === 'evening') {
       // Evening shift: 4:00 PM - 10 PM
-      // Late if check-in is after 4:00 PM
-      if (checkInHour < 16) {
-        // Check-in before 4 PM for evening shift is not allowed/early
-        status = 'Present'; // Allow early check-in
-      } else if (checkInHour > 16 || (checkInHour === 16 && checkInMinute > 0)) {
+      // Present if check-in at or before 4:00 PM, Late if after 4:00 PM
+      if (checkInHour > 16 || (checkInHour === 16 && checkInMinute > 0)) {
         status = 'Late'; // Check-in after 4:00 PM is late
       } else {
-        status = 'Present'; // Check-in exactly at 4:00 PM
+        status = 'Present'; // Check-in at or before 4:00 PM is on time
       }
     }
     
