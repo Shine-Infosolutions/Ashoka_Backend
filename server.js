@@ -235,10 +235,12 @@ wss.on("connection", (ws) => {
   );
 });
 
-// For local development
 if (process.env.NODE_ENV !== "production") {
   const PORT = process.env.PORT || 5000;
   server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+}else{
+    const PORT = 3000;
+    server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 }
 
 // Export for serverless
