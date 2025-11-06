@@ -12,7 +12,13 @@ exports.getAllTables = async (req, res) => {
     
     const tables = await Table.find(filter).sort({ tableNumber: 1 });
     
-    res.json({ success: true, tables });
+    // Ensure all tables have status field
+    const tablesWithStatus = tables.map(table => ({
+      ...table.toObject(),
+      status: table.status || 'available'
+    }));
+    
+    res.json({ success: true, tables: tablesWithStatus });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -86,6 +92,27 @@ exports.updateTableStatus = async (req, res) => {
         tableNumber: table.tableNumber,
         status: table.status
       });
+    }
+    
+    res.json({ success: true, table });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
+// Update table status by table number
+exports.updateTableStatusByNumber = async (req, res) => {
+  try {
+    const { tableNumber, status } = req.body;
+    
+    const table = await Table.findOneAndUpdate(
+      { tableNumber },
+      { status },
+      { new: true }
+    );
+    
+    if (!table) {
+      return res.status(404).json({ error: 'Table not found' });
     }
     
     res.json({ success: true, table });

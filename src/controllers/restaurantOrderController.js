@@ -92,17 +92,23 @@ exports.createOrder = async (req, res) => {
 
     // Update table status to occupied
     try {
+      console.log('Attempting to update table status for table:', order.tableNo);
       const table = await Table.findOneAndUpdate(
         { tableNumber: order.tableNo },
         { status: 'occupied' },
         { new: true }
       );
-      if (table && io) {
-        io.to('waiters').emit('table-status-updated', {
-          tableId: table._id,
-          tableNumber: table.tableNumber,
-          status: 'occupied'
-        });
+      if (table) {
+        console.log('Table status updated successfully:', table.tableNumber, 'to', table.status);
+        if (io) {
+          io.to('waiters').emit('table-status-updated', {
+            tableId: table._id,
+            tableNumber: table.tableNumber,
+            status: 'occupied'
+          });
+        }
+      } else {
+        console.log('Table not found with number:', order.tableNo);
       }
     } catch (tableError) {
       console.error('Error updating table status:', tableError);
@@ -291,23 +297,48 @@ exports.updateOrderStatus = async (req, res) => {
       });
     }
 
-    // Update table status when order is completed/paid
-    if (status === 'completed' || status === 'paid') {
-      try {
-        const table = await Table.findOneAndUpdate(
-          { tableNumber: order.tableNo },
-          { status: 'available' },
-          { new: true }
-        );
-        if (table && io) {
-          io.to('waiters').emit('table-status-updated', {
-            tableId: table._id,
-            tableNumber: table.tableNumber,
-            status: 'available'
-          });
+    // Update table status when order is served AND paid
+    const previousStatus = order.status; // Store previous status before update
+    
+    if (status === 'paid') {
+      // Check if order was previously served before making table available
+      if (previousStatus === 'served') {
+        try {
+          const table = await Table.findOneAndUpdate(
+            { tableNumber: order.tableNo },
+            { status: 'available' },
+            { new: true }
+          );
+          if (table && io) {
+            io.to('waiters').emit('table-status-updated', {
+              tableId: table._id,
+              tableNumber: table.tableNumber,
+              status: 'available'
+            });
+          }
+        } catch (tableError) {
+          console.error('Error updating table status:', tableError);
         }
-      } catch (tableError) {
-        console.error('Error updating table status:', tableError);
+      }
+    } else if (status === 'served') {
+      // Check if order is already paid before making table available
+      if (previousStatus === 'paid') {
+        try {
+          const table = await Table.findOneAndUpdate(
+            { tableNumber: order.tableNo },
+            { status: 'available' },
+            { new: true }
+          );
+          if (table && io) {
+            io.to('waiters').emit('table-status-updated', {
+              tableId: table._id,
+              tableNumber: table.tableNumber,
+              status: 'available'
+            });
+          }
+        } catch (tableError) {
+          console.error('Error updating table status:', tableError);
+        }
       }
     }
     

@@ -15,6 +15,9 @@ router.put('/tables/:tableId', authMiddleware(['admin']), tableController.update
 // Update table status
 router.patch('/tables/:tableId/status', authMiddleware(['admin', 'staff', 'restaurant']), tableController.updateTableStatus);
 
+// Update table status by table number
+router.patch('/tables/status', authMiddleware(['admin', 'staff', 'restaurant']), tableController.updateTableStatusByNumber);
+
 // Delete table
 router.delete('/tables/:tableId', authMiddleware(['admin']), tableController.deleteTable);
 

@@ -64,9 +64,33 @@ exports.processPayment = async (req, res) => {
     
     await bill.save();
     
-    // Update order status to completed if fully paid
+    // Update order status to paid if fully paid
     if (paymentStatus === 'paid') {
-      await RestaurantOrder.findByIdAndUpdate(bill.orderId, { status: 'completed' });
+      const order = await RestaurantOrder.findByIdAndUpdate(bill.orderId, { status: 'paid' }, { new: true });
+      
+      // Update table status to available when payment is completed
+      if (order) {
+        const Table = require('../models/Table');
+        try {
+          const table = await Table.findOneAndUpdate(
+            { tableNumber: order.tableNo },
+            { status: 'available' },
+            { new: true }
+          );
+          
+          // Emit WebSocket event if available
+          const io = req.app.get('io');
+          if (table && io) {
+            io.to('waiters').emit('table-status-updated', {
+              tableId: table._id,
+              tableNumber: table.tableNumber,
+              status: 'available'
+            });
+          }
+        } catch (tableError) {
+          console.error('Error updating table status:', tableError);
+        }
+      }
     }
     
     res.json(bill);
@@ -103,5 +127,51 @@ exports.getBillById = async (req, res) => {
     res.json(bill);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+};
+
+// Update bill status
+exports.updateBillStatus = async (req, res) => {
+  try {
+    const { paymentStatus } = req.body;
+    const bill = await Bill.findByIdAndUpdate(
+      req.params.id,
+      { paymentStatus },
+      { new: true }
+    );
+    if (!bill) return res.status(404).json({ error: 'Bill not found' });
+    
+    // Update order status if bill is marked as paid
+    if (paymentStatus === 'paid') {
+      const order = await RestaurantOrder.findByIdAndUpdate(bill.orderId, { status: 'paid' }, { new: true });
+      
+      // Update table status to available when payment is completed
+      if (order) {
+        const Table = require('../models/Table');
+        try {
+          const table = await Table.findOneAndUpdate(
+            { tableNumber: order.tableNo },
+            { status: 'available' },
+            { new: true }
+          );
+          
+          // Emit WebSocket event if available
+          const io = req.app.get('io');
+          if (table && io) {
+            io.to('waiters').emit('table-status-updated', {
+              tableId: table._id,
+              tableNumber: table.tableNumber,
+              status: 'available'
+            });
+          }
+        } catch (tableError) {
+          console.error('Error updating table status:', tableError);
+        }
+      }
+    }
+    
+    res.json(bill);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
   }
 };
