@@ -10,6 +10,7 @@ const itemSchema = new mongoose.Schema({
   image: { type: String, default: '' },
   video: { type: String, default: '' },
   description: { type: String, default: '' },
+  timeToPrepare: { type: Number, default: 0 },
 }, { timestamps: true });
 
 module.exports = mongoose.models.Item || mongoose.model('Item', itemSchema);
