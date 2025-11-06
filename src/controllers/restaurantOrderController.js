@@ -77,6 +77,11 @@ exports.createOrder = async (req, res) => {
     // 🔥 WebSocket: Emit new order event
     const io = req.app.get('io');
     if (io) {
+      console.log('Emitting new-order event:', {
+        orderId: order._id,
+        tableNo: order.tableNo,
+        itemCount: kotItems.length
+      });
       io.to('waiters').emit('new-order', {
         order,
         kot,
