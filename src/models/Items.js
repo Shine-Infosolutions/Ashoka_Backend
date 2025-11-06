@@ -13,4 +13,4 @@ const itemSchema = new mongoose.Schema({
   timeToPrepare: { type: Number, default: 0 },
 }, { timestamps: true });
 
-module.exports = mongoose.models.Item || mongoose.model('Item', itemSchema);
+module.exports = mongoose.model('Item', itemSchema);
