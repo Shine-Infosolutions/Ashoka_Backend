@@ -435,33 +435,47 @@ exports.updateOrderStatus = async (req, res) => {
   }
 };
 
-// Generate invoice for an order
+// Generate invoice for an order with all KOT items
 exports.generateInvoice = async (req, res) => {
   try {
     const order = await RestaurantOrder.findById(req.params.id)
       .populate('items.itemId', 'name Price category Discount')
       .populate('createdBy', 'name');
     if (!order) return res.status(404).json({ error: 'Order not found' });
+    
+    // Get all KOTs for this order
+    const kots = await KOT.find({ orderId: order._id })
+      .populate('items.itemId', 'name Price category Discount');
+    
     let subtotal = 0;
-    const invoiceItems = order.items.map(item => {
-      const itemPrice = item.itemId?.Price || item.price;
-      const discount = item.itemId?.Discount || 0;
-      const discountAmount = (itemPrice * discount) / 100;
-      const finalPrice = itemPrice - discountAmount;
-      const itemTotal = finalPrice * item.quantity;
-      subtotal += itemTotal;
-      return {
-        name: item.itemId?.name || 'Unknown',
-        price: itemPrice,
-        discount: discount,
-        finalPrice: finalPrice,
-        quantity: item.quantity,
-        total: itemTotal
-      };
+    const invoiceItems = [];
+    
+    // Process items from all KOTs
+    kots.forEach(kot => {
+      kot.items.forEach(item => {
+        const itemPrice = item.rate || item.itemId?.Price || 0;
+        const discount = item.itemId?.Discount || 0;
+        const discountAmount = (itemPrice * discount) / 100;
+        const finalPrice = itemPrice - discountAmount;
+        const itemTotal = finalPrice * item.quantity;
+        subtotal += itemTotal;
+        
+        invoiceItems.push({
+          name: item.itemName || item.itemId?.name || 'Unknown',
+          price: itemPrice,
+          discount: discount,
+          finalPrice: finalPrice,
+          quantity: item.quantity,
+          total: itemTotal,
+          kotNumber: kot.kotNumber
+        });
+      });
     });
+    
     const orderDiscount = order.discount || 0;
     const orderDiscountAmount = (subtotal * orderDiscount) / 100;
     const finalAmount = subtotal - orderDiscountAmount;
+    
     const invoice = {
       orderId: order._id,
       tableNo: order.tableNo,
@@ -477,10 +491,12 @@ exports.generateInvoice = async (req, res) => {
       notes: order.notes,
       couponCode: order.couponCode,
       isMembership: order.isMembership,
-      isLoyalty: order.isLoyalty
+      isLoyalty: order.isLoyalty,
+      kotCount: kots.length
     };
+    
     res.json(invoice);
-} catch (error) {
-  res.status(500).json({ error: error.message });
-}
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 };
