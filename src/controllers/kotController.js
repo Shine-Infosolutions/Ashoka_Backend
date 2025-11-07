@@ -190,6 +190,20 @@ exports.updateItemStatuses = async (req, res) => {
   }
 };
 
+// Update KOT
+exports.updateKOT = async (req, res) => {
+  try {
+    const kot = await KOT.findByIdAndUpdate(req.params.id, req.body, { new: true })
+      .populate('items.itemId', 'name')
+      .populate('createdBy', 'username')
+      .populate('assignedChef', 'username');
+    if (!kot) return res.status(404).json({ error: 'KOT not found' });
+    res.json(kot);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
 // Create KOT automatically when order is created
 exports.createKOTFromOrder = async (orderId) => {
   try {
