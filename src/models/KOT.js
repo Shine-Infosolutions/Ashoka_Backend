@@ -46,13 +46,9 @@ const KOTSchema = new mongoose.Schema({
     ref: 'User'
   },
   itemStatuses: [{
-    itemIndex: { type: Number, required: true },
-    status: { 
-      type: String, 
-      enum: ['served', 'delivered'], 
-      required: true 
-    },
-    checkedAt: { type: Date, default: Date.now }
+    itemIndex: Number,
+    status: { type: String, enum: ['served', 'delivered'] },
+    updatedAt: { type: Date, default: Date.now }
   }]
 }, { timestamps: true });
 
