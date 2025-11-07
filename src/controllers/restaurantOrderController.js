@@ -125,26 +125,67 @@ exports.createOrder = async (req, res) => {
 };
 
 
-// Get all restaurant orders
+// Get all restaurant orders with KOT items
 exports.getAllOrders = async (req, res) => {
   try {
     const orders = await RestaurantOrder.find()
       .populate("items.itemId", "name Price category Discount")
       .populate("createdBy", "name")
       .sort({ createdAt: -1 });
-    res.json(orders);
+    
+    const ordersWithKotItems = await Promise.all(orders.map(async (order) => {
+      const kots = await KOT.find({ orderId: order._id })
+        .populate('items.itemId', 'name Price category');
+      
+      const allItems = [];
+      kots.forEach(kot => {
+        kot.items.forEach(item => {
+          allItems.push({
+            itemName: item.itemName || item.itemId?.name || 'Unknown',
+            price: item.rate || item.itemId?.Price || 0,
+            quantity: item.quantity,
+            total: (item.rate || item.itemId?.Price || 0) * item.quantity,
+            kotNumber: kot.kotNumber
+          });
+        });
+      });
+      
+      return {
+        ...order.toObject(),
+        allKotItems: allItems,
+        kotCount: kots.length
+      };
+    }));
+    
+    res.json(ordersWithKotItems);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-// Get a single order by ID
+// Get a single order by ID with KOT items
 exports.getOrderDetails = async (req, res) => {
   try {
     const order = await RestaurantOrder.findById(req.params.id)
       .populate('items.itemId', 'name Price category Discount')
       .populate('createdBy', 'name');
     if (!order) return res.status(404).json({ error: 'Order not found' });
+
+    const kots = await KOT.find({ orderId: order._id })
+      .populate('items.itemId', 'name Price category');
+    
+    const allItems = [];
+    kots.forEach(kot => {
+      kot.items.forEach(item => {
+        allItems.push({
+          itemName: item.itemName || item.itemId?.name || 'Unknown',
+          price: item.rate || item.itemId?.Price || 0,
+          quantity: item.quantity,
+          total: (item.rate || item.itemId?.Price || 0) * item.quantity,
+          kotNumber: kot.kotNumber
+        });
+      });
+    });
 
     const formatted = {
       _id: order._id,
@@ -158,7 +199,9 @@ exports.getOrderDetails = async (req, res) => {
         price: i.itemId?.Price || i.price,
         quantity: i.quantity,
         total: (i.itemId?.Price || i.price) * i.quantity
-      }))
+      })),
+      allKotItems: allItems,
+      kotCount: kots.length
     };
 
     res.json(formatted);

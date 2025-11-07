@@ -130,6 +130,70 @@ exports.getBillById = async (req, res) => {
   }
 };
 
+// Get bill details with items from all KOTs
+exports.getBillDetails = async (req, res) => {
+  try {
+    const KOT = require('../models/KOT');
+    const bill = await Bill.findById(req.params.id)
+      .populate('orderId')
+      .populate('cashierId', 'username');
+    
+    if (!bill) return res.status(404).json({ error: 'Bill not found' });
+    
+    const kots = await KOT.find({ orderId: bill.orderId })
+      .populate('items.itemId', 'name Price category');
+    
+    const allItems = [];
+    kots.forEach(kot => {
+      kot.items.forEach(item => {
+        allItems.push({
+          itemName: item.itemName || item.itemId?.name || 'Unknown',
+          price: item.rate || item.itemId?.Price || 0,
+          quantity: item.quantity,
+          total: (item.rate || item.itemId?.Price || 0) * item.quantity,
+          kotNumber: kot.kotNumber
+        });
+      });
+    });
+    
+    res.json({ ...bill.toObject(), items: allItems, kotCount: kots.length });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Get bill by order ID with items from all KOTs
+exports.getBillByOrderId = async (req, res) => {
+  try {
+    const KOT = require('../models/KOT');
+    const bill = await Bill.findOne({ orderId: req.params.orderId })
+      .populate('orderId')
+      .populate('cashierId', 'username');
+    
+    if (!bill) return res.status(404).json({ error: 'Bill not found' });
+    
+    const kots = await KOT.find({ orderId: req.params.orderId })
+      .populate('items.itemId', 'name Price category');
+    
+    const allItems = [];
+    kots.forEach(kot => {
+      kot.items.forEach(item => {
+        allItems.push({
+          itemName: item.itemName || item.itemId?.name || 'Unknown',
+          price: item.rate || item.itemId?.Price || 0,
+          quantity: item.quantity,
+          total: (item.rate || item.itemId?.Price || 0) * item.quantity,
+          kotNumber: kot.kotNumber
+        });
+      });
+    });
+    
+    res.json({ ...bill.toObject(), items: allItems, kotCount: kots.length });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 // Update bill status
 exports.updateBillStatus = async (req, res) => {
   try {
