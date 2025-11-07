@@ -93,7 +93,10 @@ exports.updateKOTStatus = async (req, res) => {
     if (actualTime) updates.actualTime = actualTime;
     if (assignedChef) updates.assignedChef = assignedChef;
     
-    const kot = await KOT.findByIdAndUpdate(req.params.id, updates, { new: true });
+    const kot = await KOT.findByIdAndUpdate(req.params.id, updates, { new: true })
+      .populate('items.itemId', 'name')
+      .populate('createdBy', 'username')
+      .populate('assignedChef', 'username');
     if (!kot) return res.status(404).json({ error: 'KOT not found' });
     
     // 🔥 WebSocket: Emit KOT status update
@@ -142,6 +145,48 @@ exports.getKOTById = async (req, res) => {
     res.json(kot);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+};
+
+// Update item statuses
+exports.updateItemStatuses = async (req, res) => {
+  try {
+    const { itemStatuses } = req.body;
+    
+    if (!Array.isArray(itemStatuses)) {
+      return res.status(400).json({ error: 'itemStatuses must be an array' });
+    }
+    
+    const kot = await KOT.findById(req.params.kotId);
+    if (!kot) return res.status(404).json({ error: 'KOT not found' });
+    
+    // Update or add item statuses
+    itemStatuses.forEach(({ itemIndex, status }) => {
+      const existingIndex = kot.itemStatuses.findIndex(item => item.itemIndex === itemIndex);
+      
+      if (existingIndex >= 0) {
+        kot.itemStatuses[existingIndex].status = status;
+        kot.itemStatuses[existingIndex].checkedAt = new Date();
+      } else {
+        kot.itemStatuses.push({ itemIndex, status, checkedAt: new Date() });
+      }
+    });
+    
+    await kot.save();
+    
+    // WebSocket: Emit item status update
+    const io = req.app.get('io');
+    if (io) {
+      io.to('waiters').emit('kot-item-status-updated', {
+        kotId: kot._id,
+        itemStatuses: kot.itemStatuses,
+        tableNo: kot.tableNo
+      });
+    }
+    
+    res.json({ itemStatuses: kot.itemStatuses });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
   }
 };
 

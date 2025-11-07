@@ -8,5 +8,6 @@ router.post('/create', authMiddleware(['admin', 'staff', 'restaurant']), kotCont
 router.get('/all', authMiddleware(['admin', 'staff', 'restaurant']), kotController.getAllKOTs);
 router.get('/:id', authMiddleware(['admin', 'staff', 'restaurant']), kotController.getKOTById);
 router.patch('/:id/status', authMiddleware(['admin', 'staff', 'restaurant']), kotController.updateKOTStatus);
+router.patch('/:kotId/item-statuses', authMiddleware(['admin', 'staff', 'restaurant']), kotController.updateItemStatuses);
 
 module.exports = router;
