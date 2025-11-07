@@ -19,7 +19,7 @@ exports.getAllMenuItems = async (req, res) => {
     // Transform items to show category name instead of ObjectId
     const transformedItems = items.map(item => ({
       ...item.toObject(),
-      category: item.category?.name || item.category?.toString() || item.category,
+      category: item.category?.cateName || item.category?.name || item.category?.toString() || item.category,
       foodType: item.foodType || item.type
     }));
     res.json({ success: true, data: transformedItems });
