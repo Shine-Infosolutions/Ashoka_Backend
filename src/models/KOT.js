@@ -44,7 +44,16 @@ const KOTSchema = new mongoose.Schema({
   assignedChef: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
-  }
+  },
+  itemStatuses: [{
+    itemIndex: { type: Number, required: true },
+    status: { 
+      type: String, 
+      enum: ['served', 'delivered'], 
+      required: true 
+    },
+    checkedAt: { type: Date, default: Date.now }
+  }]
 }, { timestamps: true });
 
 module.exports = mongoose.models.KOT || mongoose.model('KOT', KOTSchema);
