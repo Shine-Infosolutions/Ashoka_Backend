@@ -213,27 +213,63 @@ exports.addItemsToOrder = async (req, res) => {
     order.amount = totalAmount;
     await order.save();
     
-    const kotNumber = await generateKOTNumber();
-    const kotItems = await Promise.all(items.map(async (item) => {
-      const itemDetails = await Item.findById(item.itemId);
-      return {
-        itemId: item.itemId,
-        itemName: itemDetails?.name || 'Unknown Item',
-        price: itemDetails?.Price || 0,
-        quantity: item.quantity
-      };
-    }));
+    // Find existing KOT for this order
+    let existingKot = await KOT.findOne({ orderId: order._id });
     
-    const additionalKot = new KOT({
-      orderId: order._id,
-      kotNumber,
-      tableNo: order.tableNo,
-      items: kotItems,
-      createdBy: req.user?.id
-    });
-    await additionalKot.save();
-    
-    res.json({ order, additionalKot });
+    if (existingKot) {
+      // Add new items to existing KOT
+      for (const newItem of items) {
+        const itemDetails = await Item.findById(newItem.itemId);
+        if (!itemDetails) continue;
+        
+        existingKot.items.push({
+          itemId: newItem.itemId,
+          itemName: itemDetails.name,
+          quantity: newItem.quantity,
+          rate: itemDetails.Price,
+          amount: itemDetails.Price * newItem.quantity
+        });
+      }
+      
+      await existingKot.save();
+      
+      // WebSocket: Emit KOT update
+      const io = req.app.get('io');
+      if (io) {
+        io.to('waiters').emit('kot-items-added', {
+          kotId: existingKot._id,
+          orderId: order._id,
+          newItems: items,
+          tableNo: order.tableNo
+        });
+      }
+      
+      res.json({ order, kot: existingKot });
+    } else {
+      // Create new KOT if none exists (fallback)
+      const kotNumber = await generateKOTNumber();
+      const kotItems = await Promise.all(items.map(async (item) => {
+        const itemDetails = await Item.findById(item.itemId);
+        return {
+          itemId: item.itemId,
+          itemName: itemDetails?.name || 'Unknown Item',
+          quantity: item.quantity,
+          rate: itemDetails?.Price || 0,
+          amount: (itemDetails?.Price || 0) * item.quantity
+        };
+      }));
+      
+      const newKot = new KOT({
+        orderId: order._id,
+        kotNumber,
+        tableNo: order.tableNo,
+        items: kotItems,
+        createdBy: req.user?.id
+      });
+      await newKot.save();
+      
+      res.json({ order, kot: newKot });
+    }
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
