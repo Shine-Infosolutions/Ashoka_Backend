@@ -213,6 +213,14 @@ exports.addItemsToOrder = async (req, res) => {
     order.amount = totalAmount;
     await order.save();
     
+    // Update existing bill if it exists
+    const existingBill = await Bill.findOne({ orderId: order._id });
+    if (existingBill) {
+      existingBill.subtotal = totalAmount;
+      existingBill.totalAmount = totalAmount - existingBill.discount + existingBill.tax;
+      await existingBill.save();
+    }
+    
     // Find existing KOT for this order
     let existingKot = await KOT.findOne({ orderId: order._id });
     
