@@ -106,7 +106,9 @@ exports.createPantryOrder = async (req, res) => {
 
     const orderData = {
       ...req.body,
-      orderedBy: req.user?.id || req.body.orderedBy
+      orderedBy: req.user?.id || req.body.orderedBy,
+      packagingCharge: req.body.packagingCharge || 0,
+      labourCharge: req.body.labourCharge || 0
     };
 
     // If order type is "Pantry to Kitchen", set initial status and handle kitchen store update
@@ -219,7 +221,13 @@ exports.getPantryOrders = async (req, res) => {
 // Update pantry order
 exports.updatePantryOrder = async (req, res) => {
   try {
-    const order = await PantryOrder.findByIdAndUpdate(req.params.id, req.body, {
+    const updateData = {
+      ...req.body,
+      packagingCharge: req.body.packagingCharge || 0,
+      labourCharge: req.body.labourCharge || 0
+    };
+    
+    const order = await PantryOrder.findByIdAndUpdate(req.params.id, updateData, {
       new: true,
     });
     

@@ -23,6 +23,14 @@ const PantryOrderSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    packagingCharge: {
+      type: Number,
+      default: 0,
+    },
+    labourCharge: {
+      type: Number,
+      default: 0,
+    },
     vendorId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Vendor", // ✅ link to Vendor
