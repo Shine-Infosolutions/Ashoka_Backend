@@ -221,6 +221,23 @@ exports.getPantryOrders = async (req, res) => {
 // Update pantry order
 exports.updatePantryOrder = async (req, res) => {
   try {
+    // If status is being updated, handle stock updates first
+    if (req.body.status) {
+      const existingOrder = await PantryOrder.findById(req.params.id);
+      if (existingOrder && existingOrder.orderType === 'Pantry to vendor' && ["delivered", "fulfilled"].includes(req.body.status)) {
+        console.log('Processing vendor order fulfillment via update - updating pantry stock');
+        for (const item of existingOrder.items) {
+          console.log(`Adding ${item.quantity} of item ${item.itemId} to pantry stock`);
+          const result = await PantryItem.findByIdAndUpdate(item.itemId, {
+            $inc: { stockQuantity: Number(item.quantity) }
+          }, { new: true });
+          console.log(`Updated item stock:`, result?.name, result?.stockQuantity);
+        }
+        req.body.deliveredAt = new Date();
+        console.log('Pantry stock updated successfully via update endpoint');
+      }
+    }
+    
     const order = await PantryOrder.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
     });
@@ -304,13 +321,17 @@ exports.updatePantryOrderStatus = async (req, res) => {
     }
 
     // For vendor orders - add stock when delivered/fulfilled
-    if (order.orderType !== 'Kitchen to Pantry' && ["delivered", "fulfilled"].includes(status)) {
+    if (order.orderType === 'Pantry to vendor' && ["delivered", "fulfilled"].includes(status)) {
+      console.log('Processing vendor order fulfillment - updating pantry stock');
       order.deliveredAt = new Date();
       for (const item of order.items) {
-        await PantryItem.findByIdAndUpdate(item.itemId, {
-          $inc: { stockQuantity: item.quantity }
-        });
+        console.log(`Adding ${item.quantity} of item ${item.itemId} to pantry stock`);
+        const result = await PantryItem.findByIdAndUpdate(item.itemId, {
+          $inc: { stockQuantity: Number(item.quantity) }
+        }, { new: true });
+        console.log(`Updated item stock:`, result?.name, result?.stockQuantity);
       }
+      console.log('Pantry stock updated successfully');
     }
 
     await order.save();
