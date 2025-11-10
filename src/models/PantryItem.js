@@ -33,6 +33,7 @@ const PantryItemSchema = new mongoose.Schema({
     type: String,
     enum: [
       'piece',
+      'bag',
       'plate',
       'bowl',
       'glass',
