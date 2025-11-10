@@ -221,13 +221,7 @@ exports.getPantryOrders = async (req, res) => {
 // Update pantry order
 exports.updatePantryOrder = async (req, res) => {
   try {
-    const updateData = {
-      ...req.body,
-      packagingCharge: req.body.packagingCharge || 0,
-      labourCharge: req.body.labourCharge || 0
-    };
-    
-    const order = await PantryOrder.findByIdAndUpdate(req.params.id, updateData, {
+    const order = await PantryOrder.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
     });
     
