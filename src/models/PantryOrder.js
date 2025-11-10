@@ -84,7 +84,10 @@ const PantryOrderSchema = new mongoose.Schema(
         default: 0,
       },
       paidAt: Date,
-      paymentMethod: String,
+      paymentMethod: {
+        type: String,
+        enum: ['UPI', 'Cash'],
+      },
       transactionId: String,
       notes: String,
     },

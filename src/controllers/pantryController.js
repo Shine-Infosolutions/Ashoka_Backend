@@ -219,7 +219,26 @@ exports.getPantryOrders = async (req, res) => {
 // Update pantry order
 exports.updatePantryOrder = async (req, res) => {
   try {
-    const order = await PantryOrder.findByIdAndUpdate(req.params.id, req.body, {
+    const updateData = { ...req.body };
+    
+    // Handle payment status updates
+    if (req.body.paymentStatus || req.body.paymentDetails) {
+      if (req.body.paymentStatus) {
+        updateData.paymentStatus = req.body.paymentStatus;
+      }
+      
+      if (req.body.paymentDetails) {
+        updateData.paymentDetails = {
+          paidAmount: req.body.paymentDetails.paidAmount || 0,
+          paidAt: (req.body.paymentStatus === 'paid' || req.body.paymentStatus === 'partial') ? new Date() : null,
+          paymentMethod: req.body.paymentDetails.paymentMethod || '',
+          transactionId: req.body.paymentDetails.transactionId || '',
+          notes: req.body.paymentDetails.notes || ''
+        };
+      }
+    }
+    
+    const order = await PantryOrder.findByIdAndUpdate(req.params.id, updateData, {
       new: true,
     });
     
