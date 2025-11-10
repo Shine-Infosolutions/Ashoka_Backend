@@ -2,6 +2,11 @@ const mongoose = require("mongoose");
 
 const laundrySchema = new mongoose.Schema({
   // 🧾 Basic Guest + Room Info
+  orderType: {
+    type: String,
+    enum: ["hotel_laundry", "room_laundry"],
+    required: true
+  },
   grcNo: String,
   roomNumber: String,
   requestedByName: String, // Guest name
