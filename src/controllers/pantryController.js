@@ -310,11 +310,11 @@ exports.updatePantryOrderStatus = async (req, res) => {
     }
 
     // For vendor orders - add stock when delivered/fulfilled
-    if (order.orderType !== 'Kitchen to Pantry' && ["delivered", "fulfilled"].includes(status)) {
+    if (order.orderType === 'Pantry to vendor' && ["delivered", "fulfilled"].includes(status)) {
       order.deliveredAt = new Date();
       for (const item of order.items) {
         await PantryItem.findByIdAndUpdate(item.itemId, {
-          $inc: { stockQuantity: item.quantity }
+          $inc: { stockQuantity: Number(item.quantity) }
         });
       }
     }
