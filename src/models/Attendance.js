@@ -35,6 +35,16 @@ const attendanceSchema = new mongoose.Schema({
     enum: ['Present', 'Absent', 'Half Day', 'Late', 'Leave'],
     default: 'Present'
   },
+  checkin_status: {
+    type: String,
+    enum: ['Present', 'Late', 'Half Day', 'Absent', 'Leave'],
+    default: null
+  },
+  checkout_status: {
+    type: String,
+    enum: ['Present', 'Early', 'Late', null],
+    default: null
+  },
   leaveType: {
     type: String,
     enum: ['casual', 'sick', 'paid', 'unpaid', 'emergency'],

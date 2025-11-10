@@ -68,6 +68,7 @@ exports.clockIn = async (req, res) => {
       time_in: now,
       shift: shift,
       status: status,
+      checkin_status: status,
       notes
     });
 
@@ -114,39 +115,39 @@ exports.clockOut = async (req, res) => {
     const checkOutHour = istCheckOutTime.getHours();
     const checkOutMinute = istCheckOutTime.getMinutes();
     
-    // Shift-based checkout validation (handle missing shift field)
-    const attendanceShift = attendance.shift || 'morning'; // Default to morning for old records
+    // Determine checkout status based on shift timing
+    const attendanceShift = attendance.shift || 'morning';
+    let checkoutStatus = 'Present';
     
     if (attendanceShift === 'morning') {
-      // Morning shift: 10 AM - 4 PM (6 hours)
-      if (checkOutHour < 16 || (checkOutHour === 16 && checkOutMinute === 0)) {
+      // Morning shift: 10 AM - 4 PM
+      if (checkOutHour < 16) {
+        checkoutStatus = 'Early';
         if (hoursWorked < 3) {
-          attendance.status = 'Half Day';
-        } else if (checkOutHour >= 16) {
-          // Full shift completed
-          attendance.status = attendance.status === 'Late' ? 'Late' : 'Present';
-        } else {
-          attendance.status = 'Half Day';
+          attendance.checkin_status = 'Half Day';
         }
-      } else {
-        // Checkout after 4 PM - full shift completed
-        attendance.status = attendance.status === 'Late' ? 'Late' : 'Present';
+      } else if (checkOutHour > 16) {
+        checkoutStatus = 'Late';
       }
     } else {
-      // Evening shift: 5:08 PM - 10 PM (testing)
-      if (checkOutHour < 22 || (checkOutHour === 22 && checkOutMinute === 0)) {
+      // Evening shift: 4 PM - 10 PM
+      if (checkOutHour < 22) {
+        checkoutStatus = 'Early';
         if (hoursWorked < 3) {
-          attendance.status = 'Half Day';
-        } else if (checkOutHour >= 22) {
-          // Full shift completed
-          attendance.status = attendance.status === 'Late' ? 'Late' : 'Present';
-        } else {
-          attendance.status = 'Half Day';
+          attendance.checkin_status = 'Half Day';
         }
-      } else {
-        // Checkout after 10 PM - full shift completed
-        attendance.status = attendance.status === 'Late' ? 'Late' : 'Present';
+      } else if (checkOutHour > 22) {
+        checkoutStatus = 'Late';
       }
+    }
+    
+    attendance.checkout_status = checkoutStatus;
+    
+    // Update legacy status field for backward compatibility
+    if (attendance.checkin_status === 'Half Day') {
+      attendance.status = 'Half Day';
+    } else {
+      attendance.status = attendance.checkin_status;
     }
     
     // Ensure shift is set for old records
@@ -156,6 +157,45 @@ exports.clockOut = async (req, res) => {
 
     await attendance.save();
     res.json({ message: 'Clocked out successfully', attendance });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+/**
+ * Checkout with specific status
+ */
+exports.checkoutWithStatus = async (req, res) => {
+  try {
+    const { staffId, checkout_status, notes } = req.body;
+    if (!staffId) return res.status(400).json({ message: 'staffId is required' });
+    if (!checkout_status) return res.status(400).json({ message: 'checkout_status is required' });
+
+    const validCheckoutStatus = ['Present', 'Early', 'Late'];
+    if (!validCheckoutStatus.includes(checkout_status)) {
+      return res.status(400).json({ message: `Invalid checkout_status. Allowed: ${validCheckoutStatus.join(', ')}` });
+    }
+
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const attendance = await Attendance.findOne({ staffId, date: today });
+    
+    if (!attendance) {
+      return res.status(404).json({ message: 'No clock-in record found for today' });
+    }
+
+    if (attendance.time_out) {
+      return res.status(400).json({ message: 'Already clocked out today' });
+    }
+
+    attendance.time_out = new Date();
+    attendance.checkout_status = checkout_status;
+    if (notes) attendance.notes = notes;
+
+    await attendance.save();
+    res.json({ message: 'Checked out successfully', attendance });
 
   } catch (error) {
     console.error(error);
@@ -197,6 +237,7 @@ exports.markAttendance = async (req, res) => {
       time_in: status === 'Leave' ? undefined : new Date(time_in),
       time_out: time_out ? new Date(time_out) : undefined,
       status: status || 'Present',
+      checkin_status: status || 'Present',
       leaveType: status === 'Leave' ? leaveType : null,
       notes
     });
@@ -281,16 +322,22 @@ exports.getAllAttendance = async (req, res) => {
 // Update attendance record
 exports.updateAttendance = async (req, res) => {
   try {
-    const { attendanceId, status, time_in, time_out, notes, is_manual_checkout, leaveType } = req.body;
+    const { attendanceId, status, checkin_status, checkout_status, time_in, time_out, notes, is_manual_checkout, leaveType } = req.body;
 
     if (!attendanceId) return res.status(400).json({ message: 'attendanceId is required' });
 
     const validStatus = ['Present', 'Absent', 'Half Day', 'Late', 'Leave'];
+    const validCheckoutStatus = ['Present', 'Early', 'Late', null];
+    
     if (status && !validStatus.includes(status))
       return res.status(400).json({ message: `Invalid status. Allowed: ${validStatus.join(', ')}` });
+    if (checkin_status && !validStatus.includes(checkin_status))
+      return res.status(400).json({ message: `Invalid checkin_status. Allowed: ${validStatus.join(', ')}` });
+    if (checkout_status !== undefined && !validCheckoutStatus.includes(checkout_status))
+      return res.status(400).json({ message: `Invalid checkout_status. Allowed: ${validCheckoutStatus.join(', ')}` });
 
     const validLeaveTypes = ['casual', 'sick', 'paid', 'unpaid', 'emergency'];
-    if (status === 'Leave' && (!leaveType || !validLeaveTypes.includes(leaveType)))
+    if ((status === 'Leave' || checkin_status === 'Leave') && (!leaveType || !validLeaveTypes.includes(leaveType)))
       return res.status(400).json({ message: `Leave type required. Allowed: ${validLeaveTypes.join(', ')}` });
 
     const attendance = await Attendance.findById(attendanceId);
@@ -298,8 +345,15 @@ exports.updateAttendance = async (req, res) => {
 
     if (status) {
       attendance.status = status;
+      attendance.checkin_status = status;
       attendance.leaveType = status === 'Leave' ? leaveType : null;
     }
+    if (checkin_status) {
+      attendance.checkin_status = checkin_status;
+      attendance.status = checkin_status;
+      attendance.leaveType = checkin_status === 'Leave' ? leaveType : null;
+    }
+    if (checkout_status !== undefined) attendance.checkout_status = checkout_status;
     if (time_in) attendance.time_in = new Date(time_in);
     if (time_out) attendance.time_out = new Date(time_out);
     if (notes !== undefined) attendance.notes = notes;

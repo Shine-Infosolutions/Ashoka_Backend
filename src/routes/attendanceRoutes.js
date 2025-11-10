@@ -5,6 +5,7 @@ const attendanceController = require('../controllers/attendanceController');
 // Clock in/out
 router.post('/clock-in', attendanceController.clockIn);
 router.post('/clock-out', attendanceController.clockOut);
+router.post('/checkout-with-status', attendanceController.checkoutWithStatus);
 
 // Manual attendance marking (admin)
 router.post('/mark', attendanceController.markAttendance);
