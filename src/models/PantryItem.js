@@ -31,25 +31,8 @@ const PantryItemSchema = new mongoose.Schema({
   },
   unit: {
     type: String,
-    enum: [
-      'piece',
-      'plate',
-      'bowl',
-      'glass',
-      'cup',
-      'bottle',
-      'ml',
-      'ltr',
-      'gram',
-      'kg',
-      'packet',
-      'combo',
-      'slice',
-      'tin',
-      'scoop',
-      'portion'
-    ],
-    default: 'piece'
+    enum: ['piece', 'bag', 'plate', 'bowl', 'glass', 'cup', 'bottle', 'ml', 'ltr', 'gram', 'kg', 'packet', 'combo', 'slice', 'tin', 'scoop', 'portion'],
+    required: true
   }  
 }, { timestamps: true });
 
