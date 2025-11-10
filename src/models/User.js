@@ -16,7 +16,13 @@ const userSchema = new mongoose.Schema({
     type: String, 
     enum: ['aadhar', 'pan', 'passport', 'driving_license', 'voter_id']
   }, // ID proof type
-  phoneNumber: { type: String },
+  phoneNumber: { 
+    type: String,
+    required: function() {
+      return this.role === 'staff';
+    }
+  },
+  dateOfJoining: { type: Date },
   photo: { type: String }, // photo URL/path
   
   // Bank Details
