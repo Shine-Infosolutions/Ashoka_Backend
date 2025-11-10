@@ -75,7 +75,7 @@ exports.register = async (req, res) => {
       userData.phoneNumber = phoneNumber; // Required for staff
       // Add staff-specific fields
       if (validId) userData.validId = validId;
-      if (dateOfJoining) userData.dateOfJoining = dateOfJoining;
+      if (dateOfJoining) userData.dateOfJoining = new Date(dateOfJoining);
       if (photo) userData.photo = photo;
       if (bankDetails) userData.bankDetails = bankDetails;
       if (salaryDetails) userData.salaryDetails = salaryDetails;
@@ -309,6 +309,11 @@ exports.updateUser = async (req, res) => {
         id: dep.id,
         name: dep.name,
       }));
+    }
+
+    // Handle dateOfJoining field
+    if (updates.dateOfJoining) {
+      updates.dateOfJoining = new Date(updates.dateOfJoining);
     }
 
     const updatedUser = await User.findByIdAndUpdate(userId, updates, {
