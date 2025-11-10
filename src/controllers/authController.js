@@ -31,6 +31,7 @@ exports.register = async (req, res) => {
       restaurantRole,
       validId,
       phoneNumber,
+      dateOfJoining,
       photo,
       bankDetails,
       salaryDetails
@@ -57,6 +58,9 @@ exports.register = async (req, res) => {
     if (role === "staff" && !department) {
       return res.status(400).json({ message: "Staff must have a department" });
     }
+    if (role === "staff" && !phoneNumber) {
+      return res.status(400).json({ message: "Phone number is required for staff" });
+    }
     if (role === "restaurant" && !restaurantRole) {
       return res
         .status(400)
@@ -68,9 +72,10 @@ exports.register = async (req, res) => {
 
     if (role === "staff") {
       userData.department = normalizeDepartment(department);
+      userData.phoneNumber = phoneNumber; // Required for staff
       // Add staff-specific fields
       if (validId) userData.validId = validId;
-      if (phoneNumber) userData.phoneNumber = phoneNumber;
+      if (dateOfJoining) userData.dateOfJoining = dateOfJoining;
       if (photo) userData.photo = photo;
       if (bankDetails) userData.bankDetails = bankDetails;
       if (salaryDetails) userData.salaryDetails = salaryDetails;
@@ -162,6 +167,7 @@ exports.getStaffProfile = async (req, res) => {
       responseData.salaryDetails = user.salaryDetails;
       responseData.bankDetails = user.bankDetails;
       responseData.phoneNumber = user.phoneNumber;
+      responseData.dateOfJoining = user.dateOfJoining;
       responseData.validId = user.validId;
       responseData.photo = user.photo;
     } else if (user.role === "admin") {
@@ -280,6 +286,18 @@ exports.updateUser = async (req, res) => {
       !["admin", "staff", "restaurant"].includes(updates.role)
     ) {
       return res.status(400).json({ message: "Invalid role" });
+    }
+
+    // Get current user to check role
+    const currentUser = await User.findById(userId);
+    if (!currentUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Validate phoneNumber for staff
+    const finalRole = updates.role || currentUser.role;
+    if (finalRole === "staff" && updates.phoneNumber === "") {
+      return res.status(400).json({ message: "Phone number is required for staff" });
     }
 
     // Hash password if provided
