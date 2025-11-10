@@ -48,7 +48,7 @@ const calculateItems = async (items) => {
 exports.createLaundryOrder = async (req, res) => {
   try {
     const { 
-      bookingId, items, urgent, grcNo, roomNumber, 
+      orderType, bookingId, items, urgent, grcNo, roomNumber, 
       requestedByName, receivedBy, vendorId 
     } = req.body;
 
@@ -65,6 +65,7 @@ exports.createLaundryOrder = async (req, res) => {
 
     // ✅ Save Integrated Laundry order
     const laundryOrder = await Laundry.create({
+      orderType: orderType || (bookingId ? 'room_laundry' : 'hotel_laundry'),
       bookingId,
       vendorId,
       grcNo,
@@ -231,6 +232,11 @@ exports.updateLaundryItemStatus = async (req, res) => {
     const item = order.items.id(itemId);
     if (!item) return res.status(404).json({ message: "Item not found" });
 
+    // Ensure orderType is set if missing
+    if (!order.orderType) {
+      order.orderType = 'room_laundry'; // Default value
+    }
+
     if (status) {
       item.status = status;
       console.log(`Updated item ${itemId} status to: ${status}`);
@@ -358,6 +364,48 @@ exports.markLaundryReturned = async (req, res) => {
       { new: true }
     );
     res.json(order);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// — Return Specific Items
+exports.returnSpecificItems = async (req, res) => {
+  try {
+    const { orderId, selectedItems, returnNote } = req.body;
+    
+    const order = await Laundry.findById(orderId);
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    // Update selected items with return quantities
+    for (const itemData of selectedItems) {
+      const item = order.items.id(itemData.itemId);
+      if (item) {
+        const returnQty = itemData.returnQuantity || item.quantity;
+        item.deliveredQuantity = (item.deliveredQuantity || 0) + returnQty;
+        
+        // If all quantity is delivered, mark as delivered
+        if (item.deliveredQuantity >= item.quantity) {
+          item.status = 'delivered';
+          item.deliveredQuantity = item.quantity;
+        }
+        
+        if (returnNote) {
+          item.itemNotes = returnNote;
+        }
+      }
+    }
+
+    // Check if all items are now delivered
+    const allItemsDelivered = order.items.every(item => item.status === 'delivered');
+    if (allItemsDelivered) {
+      order.laundryStatus = 'delivered';
+      order.isReturned = true;
+      order.deliveredTime = new Date();
+    }
+
+    await order.save();
+    res.json({ message: "Items returned successfully", order });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
