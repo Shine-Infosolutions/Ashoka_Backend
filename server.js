@@ -51,6 +51,7 @@ const pantryCategoryRoutes = require("./src/routes/pantryCategoryRoutes.js");
 const kitchenOrderRoutes = require("./src/routes/kitchenRoutes.js");
 const kitchenStoreRoutes = require("./src/routes/kitchenStoreRoutes.js");
 const laundryVendorRoutes = require("./src/routes/laundryVendorRoutes.js");
+const roomServiceRoutes = require("./src/routes/roomServiceRoutes.js");
 const { restrictPantryAccess } = require("./src/middleware/authMiddleware.js");
 
 const path = require("path");
@@ -170,6 +171,7 @@ app.use("/api/pantry-categories", pantryCategoryRoutes);
 app.use("/api/kitchen-orders", kitchenOrderRoutes);
 app.use("/api/kitchen-store", kitchenStoreRoutes);
 app.use("/api/laundry-vendors", laundryVendorRoutes);
+app.use("/api/room-service", roomServiceRoutes);
 app.use("/api/salary", salaryRoutes);
 
 // Health check endpoint
