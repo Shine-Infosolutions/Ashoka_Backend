@@ -115,7 +115,7 @@ exports.clockOut = async (req, res) => {
     const checkOutHour = istCheckOutTime.getHours();
     const checkOutMinute = istCheckOutTime.getMinutes();
     
-    // Determine checkout status based on shift timing
+    // Determine checkout status based on shift timing - permanently store
     const attendanceShift = attendance.shift || 'morning';
     let checkoutStatus = 'Present';
     
@@ -123,9 +123,6 @@ exports.clockOut = async (req, res) => {
       // Morning shift: 10 AM - 4 PM
       if (checkOutHour < 16) {
         checkoutStatus = 'Early';
-        if (hoursWorked < 3) {
-          attendance.checkin_status = 'Half Day';
-        }
       } else if (checkOutHour > 16) {
         checkoutStatus = 'Late';
       }
@@ -133,21 +130,21 @@ exports.clockOut = async (req, res) => {
       // Evening shift: 4 PM - 10 PM
       if (checkOutHour < 22) {
         checkoutStatus = 'Early';
-        if (hoursWorked < 3) {
-          attendance.checkin_status = 'Half Day';
-        }
       } else if (checkOutHour > 22) {
         checkoutStatus = 'Late';
       }
     }
     
+    // Permanently store checkout status
     attendance.checkout_status = checkoutStatus;
     
-    // Update legacy status field for backward compatibility
-    if (attendance.checkin_status === 'Half Day') {
+    // Calculate overall final status based on conditions
+    if (hoursWorked < 3) {
       attendance.status = 'Half Day';
+    } else if (attendance.checkin_status === 'Late') {
+      attendance.status = 'Late';
     } else {
-      attendance.status = attendance.checkin_status;
+      attendance.status = 'Present';
     }
     
     // Ensure shift is set for old records
