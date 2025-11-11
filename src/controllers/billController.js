@@ -2,16 +2,18 @@ const Bill = require('../models/Bill');
 const RestaurantOrder = require('../models/RestaurantOrder');
 
 // Generate bill number
-const generateBillNumber = async () => {
+const generateBillNumber = async (isRoomService = false) => {
   const today = new Date();
   const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+  const prefix = isRoomService ? 'RS-' : 'BILL';
   const count = await Bill.countDocuments({
+    billNumber: { $regex: `^${prefix}` },
     createdAt: {
       $gte: new Date(today.getFullYear(), today.getMonth(), today.getDate()),
       $lt: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1)
     }
   });
-  return `BILL${dateStr}${String(count + 1).padStart(4, '0')}`;
+  return `${prefix}${dateStr}${String(count + 1).padStart(4, '0')}`;
 };
 
 // Create bill from order
@@ -22,7 +24,9 @@ exports.createBill = async (req, res) => {
     const order = await RestaurantOrder.findById(orderId);
     if (!order) return res.status(404).json({ error: 'Order not found' });
     
-    const billNumber = await generateBillNumber();
+    // Check if this is a room service order (tableNo starts with 'R')
+    const isRoomService = order.tableNo && order.tableNo.startsWith('R');
+    const billNumber = await generateBillNumber(isRoomService);
     const subtotal = order.amount;
     const discountAmount = discount || 0;
     const taxAmount = tax || 0;

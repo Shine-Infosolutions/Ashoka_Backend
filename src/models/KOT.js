@@ -15,6 +15,9 @@ const KOTSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  // Room service fields
+  guestName: String,
+  roomNumber: String,
   items: [{
     itemId: {
       type: mongoose.Schema.Types.ObjectId,
