@@ -44,7 +44,10 @@ exports.createKOT = async (req, res) => {
       items: kotItems,
       priority: priority || 'normal',
       estimatedTime,
-      createdBy: req.user?._id
+      createdBy: req.user?._id,
+      // Include room service details if applicable
+      guestName: order.guestName,
+      roomNumber: order.roomNumber
     });
     
     await kot.save();
@@ -225,7 +228,10 @@ exports.createKOTFromOrder = async (orderId) => {
       tableNo: order.tableNo,
       items: kotItems,
       priority: 'normal',
-      createdBy: order.createdBy
+      createdBy: order.createdBy,
+      // Include room service details if applicable
+      guestName: order.guestName,
+      roomNumber: order.roomNumber
     });
     
     await kot.save();

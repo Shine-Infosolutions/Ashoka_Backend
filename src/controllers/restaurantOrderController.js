@@ -29,6 +29,14 @@ exports.createOrder = async (req, res) => {
         });
       }
     }
+    
+    // ✅ Handle room service orders (tableNo starts with 'R')
+    const isRoomService = req.body.tableNo && req.body.tableNo.startsWith('R');
+    if (isRoomService && !req.body.guestName) {
+      return res.status(400).json({
+        error: "For room service orders, guestName is required",
+      });
+    }
 
     // ✅ Fetch item details (attach name and price)
     const populatedItems = await Promise.all(
@@ -70,6 +78,9 @@ exports.createOrder = async (req, res) => {
       tableNo: order.tableNo || "Inhouse Booking",
       items: kotItems,
       createdBy: req.user?.id,
+      // Include room service details if applicable
+      guestName: order.guestName,
+      roomNumber: order.roomNumber
     });
 
     await kot.save();
