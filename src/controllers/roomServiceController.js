@@ -3,9 +3,9 @@ const RoomService = require("../models/RoomService");
 // Create room service order
 exports.createOrder = async (req, res) => {
   try {
-    const { roomNumber, guestName, grcNo, bookingId, items, notes } = req.body;
+    const { serviceType, roomNumber, guestName, grcNo, bookingId, items, notes } = req.body;
     
-    if (!roomNumber || !guestName || !items || items.length === 0) {
+    if (!serviceType || !roomNumber || !guestName || !items || items.length === 0) {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
@@ -27,6 +27,7 @@ exports.createOrder = async (req, res) => {
 
     const order = new RoomService({
       orderNumber,
+      serviceType,
       roomNumber,
       guestName,
       grcNo,
@@ -50,11 +51,12 @@ exports.createOrder = async (req, res) => {
 // Get all orders
 exports.getAllOrders = async (req, res) => {
   try {
-    const { status, roomNumber, page = 1, limit = 20 } = req.query;
+    const { status, roomNumber, serviceType, page = 1, limit = 20 } = req.query;
     
     let filter = {};
     if (status) filter.status = status;
     if (roomNumber) filter.roomNumber = roomNumber;
+    if (serviceType) filter.serviceType = serviceType;
 
     const orders = await RoomService.find(filter)
       .populate("createdBy", "username")
@@ -205,6 +207,63 @@ exports.updatePaymentStatus = async (req, res) => {
     await order.save();
 
     res.json({ success: true, order });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get room service charges for checkout
+exports.getRoomServiceCharges = async (req, res) => {
+  try {
+    const { bookingId } = req.query;
+    
+    if (!bookingId) {
+      return res.status(400).json({ message: "Booking ID is required" });
+    }
+
+    const filter = {
+      bookingId: bookingId,
+      status: "delivered",
+      paymentStatus: "unpaid"
+    };
+
+    const orders = await RoomService.find(filter)
+      .select('orderNumber serviceType totalAmount items createdAt')
+      .sort({ createdAt: -1 });
+
+    const totalCharges = orders.reduce((sum, order) => sum + order.totalAmount, 0);
+
+    res.json({
+      success: true,
+      orders,
+      totalCharges,
+      count: orders.length
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Mark room service orders as paid
+exports.markOrdersPaid = async (req, res) => {
+  try {
+    const { bookingId } = req.body;
+    
+    if (!bookingId) {
+      return res.status(400).json({ message: "Booking ID is required" });
+    }
+
+    const filter = {
+      bookingId: bookingId,
+      status: "delivered",
+      paymentStatus: "unpaid"
+    };
+
+    await RoomService.updateMany(filter, {
+      paymentStatus: "paid"
+    });
+
+    res.json({ success: true, message: "Room service orders marked as paid" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

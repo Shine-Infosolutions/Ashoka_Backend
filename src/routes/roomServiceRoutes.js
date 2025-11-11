@@ -24,6 +24,12 @@ router.post("/order/:id/bill", authMiddleware(["admin", "staff"], ["reception"])
 // Bill lookup
 router.get("/bill-lookup", authMiddleware(["admin", "staff"], ["reception"]), roomServiceController.billLookup);
 
+// Get room service charges for checkout
+router.get("/room-charges", authMiddleware(["admin", "staff"], ["reception"]), roomServiceController.getRoomServiceCharges);
+
+// Mark room service orders as paid
+router.post("/mark-paid", authMiddleware(["admin", "staff"], ["reception"]), roomServiceController.markOrdersPaid);
+
 // Update payment status
 router.patch("/order/:id/payment", authMiddleware(["admin", "staff"], ["reception"]), roomServiceController.updatePaymentStatus);
 
