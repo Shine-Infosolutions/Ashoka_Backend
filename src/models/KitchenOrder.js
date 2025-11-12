@@ -41,6 +41,11 @@ const KitchenOrderSchema = new mongoose.Schema({
   specialInstructions: {
     type: String
   },
+  orderedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
   deliveredAt: {
     type: Date
   },

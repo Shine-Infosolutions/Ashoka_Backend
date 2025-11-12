@@ -6,7 +6,8 @@ const {
   getKitchenOrderById,
   createKitchenOrder,
   updateKitchenOrder,
-  deleteKitchenOrder
+  deleteKitchenOrder,
+  syncMissingKitchenOrders
 } = require('../controllers/kitchenOrderController');
 
 // Kitchen Order routes
@@ -15,5 +16,6 @@ router.get('/:id', authMiddleware(['admin', 'staff', 'restaurant']), getKitchenO
 router.post('/', authMiddleware(['admin', 'staff', 'restaurant']), createKitchenOrder);
 router.put('/:id', authMiddleware(['admin', 'staff', 'restaurant']), updateKitchenOrder);
 router.delete('/:id', authMiddleware(['admin', 'staff', 'restaurant']), deleteKitchenOrder);
+router.post('/sync', authMiddleware(['admin', 'staff']), syncMissingKitchenOrders);
 
 module.exports = router;

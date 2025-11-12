@@ -8,6 +8,7 @@ const getAllKitchenOrders = async (req, res) => {
       .populate('vendorId', 'name');
     res.json(orders);
   } catch (error) {
+    console.error('Kitchen orders fetch error:', error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -43,20 +44,32 @@ const createKitchenOrder = async (req, res) => {
       try {
         const PantryOrder = require('../models/PantryOrder');
         
+        console.log('Creating pantry order for kitchen order:', savedOrder._id);
+        
         const pantryOrder = new PantryOrder({
-          items: savedOrder.items,
+          items: savedOrder.items.map(item => ({
+            itemId: item.itemId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice || 0
+          })),
           totalAmount: savedOrder.totalAmount,
           orderType: 'Kitchen to Pantry',
-          specialInstructions: savedOrder.specialInstructions,
+          specialInstructions: savedOrder.specialInstructions || `Order from kitchen: ${savedOrder._id}`,
           orderedBy: savedOrder.orderedBy,
           kitchenOrderId: savedOrder._id,
           status: 'pending'
         });
         
-        await pantryOrder.save();
-        console.log('Pantry order created:', pantryOrder._id);
+        const savedPantryOrder = await pantryOrder.save();
+        console.log('Pantry order created successfully:', savedPantryOrder._id);
+        
+        // Link pantry order back to kitchen order
+        savedOrder.pantryOrderId = savedPantryOrder._id;
+        await savedOrder.save();
+        console.log('Kitchen order updated with pantry order link');
       } catch (error) {
         console.error('Failed to create pantry order:', error);
+        console.error('Pantry order creation error stack:', error.stack);
       }
     }
     
@@ -85,32 +98,46 @@ const updateKitchenOrder = async (req, res) => {
     }
 
     // Update kitchen store when items are received from pantry
-    if (req.body.status === 'delivered' && order.orderType === 'kitchen_to_pantry' && order.items && order.items.length > 0) {
+    if (req.body.status === 'delivered' && (order.orderType === 'kitchen_to_pantry' || order.orderType === 'pantry_to_kitchen') && order.items && order.items.length > 0) {
       try {
         const KitchenStore = require('../models/KitchenStore');
         
+        console.log(`Updating kitchen store for ${order.orderType} order:`, order._id);
+        
         for (const orderItem of order.items) {
+          const itemName = orderItem.itemId?.name || orderItem.name;
+          const itemUnit = orderItem.itemId?.unit || orderItem.unit || 'pcs';
+          const itemQuantity = Number(orderItem.quantity);
+          
+          if (!itemName || itemQuantity <= 0) {
+            console.log('Skipping invalid item:', orderItem);
+            continue;
+          }
+          
           let kitchenItem = await KitchenStore.findOne({ 
-            name: orderItem.itemId.name 
+            name: itemName 
           });
           
           if (kitchenItem) {
-            kitchenItem.quantity = Number(kitchenItem.quantity) + Number(orderItem.quantity);
+            const oldQuantity = Number(kitchenItem.quantity);
+            kitchenItem.quantity = oldQuantity + itemQuantity;
             await kitchenItem.save();
-            console.log(`Updated kitchen store: ${kitchenItem.name} +${orderItem.quantity} = ${kitchenItem.quantity}`);
+            console.log(`Updated kitchen store: ${itemName} ${oldQuantity} + ${itemQuantity} = ${kitchenItem.quantity} ${itemUnit}`);
           } else {
             kitchenItem = new KitchenStore({
-              name: orderItem.itemId.name,
+              name: itemName,
               category: 'Food',
-              quantity: Number(orderItem.quantity),
-              unit: orderItem.itemId.unit || 'pcs'
+              quantity: itemQuantity,
+              unit: itemUnit
             });
             await kitchenItem.save();
-            console.log(`Created new kitchen store item: ${kitchenItem.name} with ${orderItem.quantity} ${kitchenItem.unit}`);
+            console.log(`Created new kitchen store item: ${itemName} with ${itemQuantity} ${itemUnit}`);
           }
         }
+        console.log('Kitchen store update completed successfully');
       } catch (kitchenStoreError) {
         console.error('Failed to update kitchen store:', kitchenStoreError.message);
+        console.error('Kitchen store error stack:', kitchenStoreError.stack);
       }
     }
 
@@ -166,10 +193,89 @@ const deleteKitchenOrder = async (req, res) => {
   }
 };
 
+// Sync missing kitchen orders from pantry orders
+const syncMissingKitchenOrders = async (req, res) => {
+  try {
+    const PantryOrder = require('../models/PantryOrder');
+    
+    // Find Kitchen to Pantry orders that are approved but don't have linked kitchen orders
+    const pantryOrders = await PantryOrder.find({
+      orderType: 'Kitchen to Pantry',
+      status: { $in: ['approved', 'fulfilled'] },
+      kitchenOrderId: { $exists: false }
+    }).populate('items.itemId', 'name unit');
+    
+    console.log('Found pantry orders without kitchen orders:', pantryOrders.length);
+    
+    const createdOrders = [];
+    
+    for (const pantryOrder of pantryOrders) {
+      const kitchenOrder = new KitchenOrder({
+        items: pantryOrder.items,
+        totalAmount: pantryOrder.totalAmount,
+        status: pantryOrder.status === 'approved' ? 'delivered' : 'approved',
+        orderType: 'kitchen_to_pantry',
+        specialInstructions: pantryOrder.specialInstructions || `Synced from pantry order ${pantryOrder._id}`,
+        orderedBy: pantryOrder.orderedBy,
+        pantryOrderId: pantryOrder._id
+      });
+      
+      const savedKitchenOrder = await kitchenOrder.save();
+      
+      // If pantry order is approved/fulfilled, add items to kitchen store
+      if (pantryOrder.status === 'approved' || pantryOrder.status === 'fulfilled') {
+        const KitchenStore = require('../models/KitchenStore');
+        
+        for (const orderItem of pantryOrder.items) {
+          const itemName = orderItem.itemId?.name || 'Unknown Item';
+          const itemQuantity = Number(orderItem.quantity);
+          const itemUnit = orderItem.itemId?.unit || 'pcs';
+          
+          if (itemName && itemQuantity > 0) {
+            let kitchenItem = await KitchenStore.findOne({ name: itemName });
+            
+            if (kitchenItem) {
+              kitchenItem.quantity = Number(kitchenItem.quantity) + itemQuantity;
+              await kitchenItem.save();
+              console.log(`Updated kitchen store: ${itemName} +${itemQuantity} = ${kitchenItem.quantity}`);
+            } else {
+              kitchenItem = new KitchenStore({
+                name: itemName,
+                category: 'Food',
+                quantity: itemQuantity,
+                unit: itemUnit
+              });
+              await kitchenItem.save();
+              console.log(`Created kitchen store item: ${itemName} with ${itemQuantity} ${itemUnit}`);
+            }
+          }
+        }
+      }
+      
+      // Link back to pantry order
+      pantryOrder.kitchenOrderId = savedKitchenOrder._id;
+      await pantryOrder.save();
+      
+      createdOrders.push(savedKitchenOrder);
+      console.log('Created kitchen order:', savedKitchenOrder._id, 'for pantry order:', pantryOrder._id);
+    }
+    
+    res.json({ 
+      success: true, 
+      message: `Synced ${createdOrders.length} kitchen orders`,
+      createdOrders: createdOrders.map(o => ({ id: o._id, pantryOrderId: o.pantryOrderId }))
+    });
+  } catch (error) {
+    console.error('Sync kitchen orders error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getAllKitchenOrders,
   getKitchenOrderById,
   createKitchenOrder,
   updateKitchenOrder,
-  deleteKitchenOrder
+  deleteKitchenOrder,
+  syncMissingKitchenOrders
 };

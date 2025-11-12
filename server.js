@@ -65,6 +65,7 @@ const io = new Server(server, {
       "http://localhost:3000",
       "https://ashokacrm.vercel.app",
       "https://zomato-frontend-mocha.vercel.app",
+      "https://ashoka-api.shineinfosolutions.in",
     ],
     methods: ["GET", "POST"],
   },
@@ -80,6 +81,7 @@ const allowedOrigins = [
   "http://localhost:5000",
   "https://ashoka-backend.vercel.app",
   "https://ashokacrm.vercel.app",
+  "https://ashoka-api.shineinfosolutions.in",
 ];
 app.use(
   cors({
