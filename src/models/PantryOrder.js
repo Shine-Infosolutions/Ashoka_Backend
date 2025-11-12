@@ -99,6 +99,22 @@ const PantryOrderSchema = new mongoose.Schema(
       transactionId: String,
       notes: String,
     },
+    originalRequest: {
+      items: [{
+        itemId: String,
+        name: String,
+        quantity: Number,
+        unitPrice: Number,
+        unit: String
+      }],
+      outOfStockItems: [{
+        itemId: String,
+        name: String,
+        requestedQuantity: Number,
+        availableQuantity: Number,
+        neededQuantity: Number
+      }]
+    },
   },
   { timestamps: true }
 );
