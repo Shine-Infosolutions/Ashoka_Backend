@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 
 const roomServiceSchema = new mongoose.Schema({
   orderNumber: { type: String, required: true, unique: true },
+  serviceType: { type: String, enum: ['restaurant', 'laundry', 'cleaning'], required: true },
   roomNumber: { type: String, required: true },
   guestName: { type: String, required: true },
   grcNo: { type: String },
