@@ -413,42 +413,53 @@ exports.updatePantryOrderStatus = async (req, res) => {
         const KitchenOrder = require('../models/KitchenOrder');
         const KitchenStore = require('../models/KitchenStore');
         
-        // Populate items to get item details
-        await order.populate('items.itemId', 'name unit');
+        // Use available items or create a note about out-of-stock items
+        const itemsToProcess = order.items?.length > 0 ? order.items : [];
         
-        // Reduce pantry stock for available items only
-        for (const item of order.items) {
-          if (item.quantity > 0) {
-            await PantryItem.findByIdAndUpdate(item.itemId, {
-              $inc: { stockQuantity: -Number(item.quantity) }
-            });
+        // Populate items to get item details if any available
+        if (itemsToProcess.length > 0) {
+          await order.populate('items.itemId', 'name unit');
+          
+          // Reduce pantry stock for available items only
+          for (const item of itemsToProcess) {
+            if (item.quantity > 0) {
+              await PantryItem.findByIdAndUpdate(item.itemId, {
+                $inc: { stockQuantity: -Number(item.quantity) }
+              });
+            }
           }
         }
         
-        // Create or update kitchen order
+        // Always create kitchen order (even if no items were available)
         let kitchenOrder;
+        const orderItems = itemsToProcess.length > 0 ? itemsToProcess : [];
+        const orderNotes = itemsToProcess.length === 0 ? 
+          `All requested items were out of stock. Vendor order created for restocking. Original request: ${order.specialInstructions || 'Items requested'}` :
+          order.specialInstructions;
+        
         if (order.kitchenOrderId) {
           kitchenOrder = await KitchenOrder.findByIdAndUpdate(order.kitchenOrderId, {
-            status: 'delivered',
-            receivedAt: new Date()
+            status: itemsToProcess.length > 0 ? 'delivered' : 'pending_restock',
+            receivedAt: itemsToProcess.length > 0 ? new Date() : null,
+            specialInstructions: orderNotes
           }, { new: true });
         } else {
           // Create new kitchen order
           kitchenOrder = new KitchenOrder({
-            items: order.items,
+            items: orderItems,
             totalAmount: order.totalAmount,
-            status: 'delivered',
+            status: itemsToProcess.length > 0 ? 'delivered' : 'pending_restock',
             orderType: 'pantry_to_kitchen',
-            specialInstructions: order.specialInstructions,
+            specialInstructions: orderNotes,
             orderedBy: order.orderedBy,
             pantryOrderId: order._id,
-            receivedAt: new Date()
+            receivedAt: itemsToProcess.length > 0 ? new Date() : null
           });
           await kitchenOrder.save();
         }
         
-        // Add items to kitchen store
-        for (const orderItem of order.items) {
+        // Add available items to kitchen store
+        for (const orderItem of itemsToProcess) {
           if (orderItem.quantity > 0) {
             let kitchenItem = await KitchenStore.findOne({ 
               name: orderItem.itemId.name 
@@ -469,7 +480,7 @@ exports.updatePantryOrderStatus = async (req, res) => {
           }
         }
         
-        console.log('Kitchen order created and items added to kitchen store');
+        console.log(`Kitchen order created. Items delivered: ${itemsToProcess.length}`);
         order.status = 'fulfilled';
         order.deliveredAt = new Date();
       } catch (error) {
