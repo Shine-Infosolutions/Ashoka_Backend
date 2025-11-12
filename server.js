@@ -60,16 +60,24 @@ const app = express();
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: [
-      "http://localhost:5173",
-      "http://localhost:3000",
-      "https://ashokacrm.vercel.app",
-      "https://zomato-frontend-mocha.vercel.app",
-      "https://ashoka-api.shineinfosolutions.in",
-    ],
+    origin: function (origin, callback) {
+      const allowedOrigins = [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "https://ashokacrm.vercel.app",
+        "https://zomato-frontend-mocha.vercel.app",
+        "https://ashoka-api.shineinfosolutions.in",
+      ];
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     methods: ["GET", "POST"],
+    credentials: true
   },
-  transports: ['websocket', 'polling']
+  transports: ['polling', 'websocket']
 });
 
 // Make io available globally
@@ -195,10 +203,34 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: "Server error", message: err.message });
 });
 
-// Socket.io connection handling (for existing features)
+// Socket.io connection handling
 io.on("connection", (socket) => {
+  console.log(`🔗 Client connected: ${socket.id}`);
+  
+  // Join rooms
   socket.on("join-waiter-dashboard", () => {
     socket.join("waiters");
+    console.log(`👨‍🍳 Socket ${socket.id} joined waiters room`);
+  });
+  
+  socket.on("join-pantry-updates", () => {
+    socket.join("pantry-updates");
+    console.log(`🥫 Socket ${socket.id} joined pantry-updates room`);
+  });
+  
+  socket.on("join-kitchen-updates", () => {
+    socket.join("kitchen-updates");
+    console.log(`🍳 Socket ${socket.id} joined kitchen-updates room`);
+  });
+  
+  // Test message handler
+  socket.on("test-message", (data) => {
+    console.log(`📨 Test message received from ${socket.id}:`, data);
+    socket.emit("test-response", { message: "Hello from server!", timestamp: new Date() });
+  });
+  
+  socket.on("disconnect", (reason) => {
+    console.log(`❌ Client disconnected: ${socket.id}, reason: ${reason}`);
   });
 });
 
