@@ -2,6 +2,73 @@ const PantryItem = require("../models/PantryItem");
 const PantryOrder = require("../models/PantryOrder");
 const ExcelJS = require('exceljs');
 
+// Auto-create vendor order for out-of-stock items
+exports.autoCreateVendorOrder = async (outOfStockItems, orderedBy) => {
+  try {
+    const Vendor = require('../models/Vendor');
+    
+    // Find the best vendor based on past performance
+    const vendors = await Vendor.find({ isActive: true });
+    if (vendors.length === 0) {
+      console.log('No active vendor found for auto-ordering');
+      return null;
+    }
+
+    // Get vendor performance stats
+    let bestVendor = vendors[0]; // Default to first vendor
+    let bestScore = -1;
+
+    for (const vendor of vendors) {
+      const orders = await PantryOrder.find({ 
+        vendorId: vendor._id,
+        orderType: 'Pantry to vendor'
+      });
+      
+      const totalOrders = orders.length;
+      const fulfilledOrders = orders.filter(o => o.status === 'fulfilled').length;
+      const fulfillmentRate = totalOrders > 0 ? (fulfilledOrders / totalOrders) : 0;
+      
+      // Score based on fulfillment rate and total orders (experience)
+      const score = fulfillmentRate * 0.7 + Math.min(totalOrders / 10, 1) * 0.3;
+      
+      if (score > bestScore) {
+        bestScore = score;
+        bestVendor = vendor;
+      }
+    }
+
+    const vendorOrderItems = outOfStockItems.map(item => ({
+      itemId: item.itemId,
+      quantity: item.neededQuantity,
+      unitPrice: item.estimatedPrice || 0
+    }));
+
+    const totalAmount = vendorOrderItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+
+    const vendorOrder = new PantryOrder({
+      items: vendorOrderItems,
+      totalAmount,
+      vendorId: bestVendor._id,
+      status: 'pending',
+      orderType: 'Pantry to vendor',
+      specialInstructions: `Auto-generated order for out-of-stock items: ${outOfStockItems.map(i => i.name).join(', ')}. Selected vendor based on ${(bestScore * 100).toFixed(1)}% performance score.`,
+      orderedBy
+    });
+
+    await vendorOrder.save();
+    await vendorOrder.populate([
+      { path: 'vendorId', select: 'name phone email' },
+      { path: 'orderedBy', select: 'username email' }
+    ]);
+
+    console.log(`Auto-created vendor order with ${bestVendor.name} (score: ${(bestScore * 100).toFixed(1)}%):`, vendorOrder._id);
+    return vendorOrder;
+  } catch (error) {
+    console.error('Failed to auto-create vendor order:', error);
+    return null;
+  }
+};
+
 // Get all pantry items with category details
 exports.getAllPantryItems = async (req, res) => {
   try {
@@ -89,6 +156,50 @@ exports.createPantryOrder = async (req, res) => {
       console.log('Index handling:', e.message);
     }
     
+    let outOfStockItems = [];
+    let availableItems = [];
+    let autoVendorOrder = null;
+
+    // Check stock availability and separate available vs out-of-stock items
+    if (req.body.orderType === 'Kitchen to Pantry') {
+      for (const item of req.body.items) {
+        const pantryItem = await PantryItem.findById(item.itemId || item.pantryItemId);
+        if (!pantryItem) {
+          return res.status(404).json({ error: `Item ${item.itemId || item.pantryItemId} not found` });
+        }
+        
+        if (pantryItem.stockQuantity < item.quantity) {
+          // Item is out of stock or insufficient
+          const neededQuantity = item.quantity - pantryItem.stockQuantity;
+          outOfStockItems.push({
+            itemId: pantryItem._id,
+            name: pantryItem.name,
+            requestedQuantity: item.quantity,
+            availableQuantity: pantryItem.stockQuantity,
+            neededQuantity: Math.max(neededQuantity, pantryItem.minStockLevel || 10),
+            estimatedPrice: pantryItem.price || 0
+          });
+          
+          // If there's some stock available, add it to available items
+          if (pantryItem.stockQuantity > 0) {
+            availableItems.push({
+              ...item,
+              quantity: pantryItem.stockQuantity,
+              unitPrice: item.unitPrice
+            });
+          }
+        } else {
+          // Item has sufficient stock
+          availableItems.push(item);
+        }
+      }
+
+      // Auto-create vendor order for out-of-stock items
+      if (outOfStockItems.length > 0) {
+        autoVendorOrder = await exports.autoCreateVendorOrder(outOfStockItems, req.user?.id || req.body.orderedBy);
+      }
+    }
+
     // Validate stock availability for Pantry to Kitchen orders
     if (req.body.orderType === 'Pantry to Kitchen') {
       for (const item of req.body.items) {
@@ -104,8 +215,18 @@ exports.createPantryOrder = async (req, res) => {
       }
     }
 
+    // Use available items for Kitchen to Pantry orders, or original items for other order types
+    const itemsToOrder = req.body.orderType === 'Kitchen to Pantry' ? availableItems : req.body.items;
+    
+    // Calculate total amount for available items only
+    const totalAmount = req.body.orderType === 'Kitchen to Pantry' 
+      ? itemsToOrder.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0)
+      : req.body.totalAmount;
+
     const orderData = {
       ...req.body,
+      items: itemsToOrder,
+      totalAmount,
       orderedBy: req.user?.id || req.body.orderedBy,
       packagingCharge: req.body.packagingCharge || 0,
       labourCharge: req.body.labourCharge || 0
@@ -191,7 +312,18 @@ exports.createPantryOrder = async (req, res) => {
       ]);
     }
 
-    res.status(201).json({ success: true, order });
+    // Prepare response with vendor order info if created
+    const response = { 
+      success: true, 
+      order,
+      outOfStockItems: outOfStockItems.length > 0 ? outOfStockItems : undefined,
+      autoVendorOrder: autoVendorOrder || undefined,
+      message: outOfStockItems.length > 0 
+        ? `Order created with available items. Vendor order auto-created for ${outOfStockItems.length} out-of-stock items.`
+        : 'Order created successfully'
+    };
+
+    res.status(201).json(response);
   } catch (error) {
     console.error('Create pantry order error:', error);
     res.status(400).json({ error: error.message });
@@ -880,6 +1012,53 @@ exports.getVendorAnalytics = async (req, res) => {
     };
 
     res.json({ success: true, analytics });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Get suggested vendors for auto-ordering
+exports.getSuggestedVendors = async (req, res) => {
+  try {
+    const Vendor = require('../models/Vendor');
+    
+    // Get all active vendors
+    const vendors = await Vendor.find({ isActive: true }).sort({ name: 1 });
+    
+    // Get vendor order history to suggest best vendors
+    const vendorStats = await Promise.all(vendors.map(async (vendor) => {
+      const orders = await PantryOrder.find({ 
+        vendorId: vendor._id,
+        orderType: 'Pantry to vendor'
+      });
+      
+      const totalOrders = orders.length;
+      const fulfilledOrders = orders.filter(o => o.status === 'fulfilled').length;
+      const totalAmount = orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+      const avgAmount = totalOrders > 0 ? totalAmount / totalOrders : 0;
+      const fulfillmentRate = totalOrders > 0 ? (fulfilledOrders / totalOrders) * 100 : 0;
+      
+      return {
+        ...vendor.toObject(),
+        stats: {
+          totalOrders,
+          fulfilledOrders,
+          totalAmount,
+          avgAmount,
+          fulfillmentRate
+        }
+      };
+    }));
+    
+    // Sort by fulfillment rate and total orders
+    const suggestedVendors = vendorStats.sort((a, b) => {
+      if (b.stats.fulfillmentRate !== a.stats.fulfillmentRate) {
+        return b.stats.fulfillmentRate - a.stats.fulfillmentRate;
+      }
+      return b.stats.totalOrders - a.stats.totalOrders;
+    });
+    
+    res.json({ success: true, vendors: suggestedVendors });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

@@ -138,6 +138,12 @@ router.get(
 );
 
 router.get(
+  "/suggested-vendors",
+  authMiddleware(["admin", "staff", "pantry"]),
+  pantryController.getSuggestedVendors
+);
+
+router.get(
   "/items/excel-report",
   authMiddleware(["admin", "staff"], ["pantry", "reception"]),
   pantryController.generatePantryItemsExcel
