@@ -69,6 +69,7 @@ const io = new Server(server, {
     ],
     methods: ["GET", "POST"],
   },
+  transports: ['websocket']
 });
 
 // Make io available globally
