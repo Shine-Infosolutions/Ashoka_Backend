@@ -229,7 +229,12 @@ exports.createPantryOrder = async (req, res) => {
       totalAmount,
       orderedBy: req.user?.id || req.body.orderedBy,
       packagingCharge: req.body.packagingCharge || 0,
-      labourCharge: req.body.labourCharge || 0
+      labourCharge: req.body.labourCharge || 0,
+      // Store original request for Kitchen to Pantry orders
+      originalRequest: req.body.orderType === 'Kitchen to Pantry' ? {
+        items: req.body.items,
+        outOfStockItems: outOfStockItems
+      } : undefined
     };
 
     // If order type is "Pantry to Kitchen", set initial status and handle kitchen store update
