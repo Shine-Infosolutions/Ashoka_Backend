@@ -404,26 +404,46 @@ exports.updatePantryOrderStatus = async (req, res) => {
     // If Kitchen to Pantry order is approved, reduce pantry stock and update kitchen order
     if (order.orderType === 'Kitchen to Pantry' && status === 'approved') {
       try {
-        // Reduce pantry stock
+        const KitchenOrder = require('../models/KitchenOrder');
+        const KitchenStore = require('../models/KitchenStore');
+        
+        // Populate items to get item details
+        await order.populate('items.itemId', 'name unit');
+        
+        // Reduce pantry stock for available items only
         for (const item of order.items) {
-          await PantryItem.findByIdAndUpdate(item.itemId, {
-            $inc: { stockQuantity: -Number(item.quantity) }
-          });
+          if (item.quantity > 0) {
+            await PantryItem.findByIdAndUpdate(item.itemId, {
+              $inc: { stockQuantity: -Number(item.quantity) }
+            });
+          }
         }
         
-        // Update linked kitchen order status to delivered
+        // Create or update kitchen order
+        let kitchenOrder;
         if (order.kitchenOrderId) {
-          const KitchenOrder = require('../models/KitchenOrder');
-          await KitchenOrder.findByIdAndUpdate(order.kitchenOrderId, {
+          kitchenOrder = await KitchenOrder.findByIdAndUpdate(order.kitchenOrderId, {
             status: 'delivered',
             receivedAt: new Date()
+          }, { new: true });
+        } else {
+          // Create new kitchen order
+          kitchenOrder = new KitchenOrder({
+            items: order.items,
+            totalAmount: order.totalAmount,
+            status: 'delivered',
+            orderType: 'pantry_to_kitchen',
+            specialInstructions: order.specialInstructions,
+            orderedBy: order.orderedBy,
+            pantryOrderId: order._id,
+            receivedAt: new Date()
           });
-          
-          // Add items to kitchen store
-          const KitchenStore = require('../models/KitchenStore');
-          await order.populate('items.itemId', 'name unit');
-          
-          for (const orderItem of order.items) {
+          await kitchenOrder.save();
+        }
+        
+        // Add items to kitchen store
+        for (const orderItem of order.items) {
+          if (orderItem.quantity > 0) {
             let kitchenItem = await KitchenStore.findOne({ 
               name: orderItem.itemId.name 
             });
@@ -441,10 +461,9 @@ exports.updatePantryOrderStatus = async (req, res) => {
               await kitchenItem.save();
             }
           }
-          
-          console.log('Items added to kitchen store from pantry approval');
         }
         
+        console.log('Kitchen order created and items added to kitchen store');
         order.status = 'fulfilled';
         order.deliveredAt = new Date();
       } catch (error) {
