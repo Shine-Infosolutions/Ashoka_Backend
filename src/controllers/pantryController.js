@@ -215,15 +215,16 @@ exports.createPantryOrder = async (req, res) => {
       }
     }
 
-    // For Kitchen to Pantry orders, keep original items but adjust quantities based on availability
+    // For Kitchen to Pantry orders, keep original items with original quantities
     let itemsToOrder, totalAmount;
     if (req.body.orderType === 'Kitchen to Pantry') {
       itemsToOrder = req.body.items.map(originalItem => {
         const availableItem = availableItems.find(ai => ai.itemId === originalItem.itemId || ai.pantryItemId === originalItem.pantryItemId);
+        const outOfStockItem = outOfStockItems.find(oos => oos.itemId.toString() === (originalItem.itemId || originalItem.pantryItemId));
         return {
           ...originalItem,
-          quantity: availableItem ? availableItem.quantity : 0, // Set to 0 if out of stock
-          availableQuantity: availableItem ? availableItem.quantity : 0
+          availableQuantity: availableItem ? availableItem.quantity : 0,
+          isOutOfStock: !availableItem || availableItem.quantity === 0
         };
       });
       totalAmount = availableItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
