@@ -428,9 +428,10 @@ exports.updatePantryOrderStatus = async (req, res) => {
         
         // Reduce pantry stock for available items only
         for (const item of order.items) {
-          if (item.quantity > 0) {
+          const availableQty = item.availableQuantity || 0;
+          if (availableQty > 0) {
             await PantryItem.findByIdAndUpdate(item.itemId, {
-              $inc: { stockQuantity: -Number(item.quantity) }
+              $inc: { stockQuantity: -Number(availableQty) }
             });
           }
         }
@@ -459,19 +460,20 @@ exports.updatePantryOrderStatus = async (req, res) => {
         
         // Add items to kitchen store
         for (const orderItem of order.items) {
-          if (orderItem.quantity > 0) {
+          const availableQty = orderItem.availableQuantity || 0;
+          if (availableQty > 0) {
             let kitchenItem = await KitchenStore.findOne({ 
               name: orderItem.itemId.name 
             });
             
             if (kitchenItem) {
-              kitchenItem.quantity = Number(kitchenItem.quantity) + Number(orderItem.quantity);
+              kitchenItem.quantity = Number(kitchenItem.quantity) + Number(availableQty);
               await kitchenItem.save();
             } else {
               kitchenItem = new KitchenStore({
                 name: orderItem.itemId.name,
                 category: 'Food',
-                quantity: Number(orderItem.quantity),
+                quantity: Number(availableQty),
                 unit: orderItem.itemId.unit || 'pcs'
               });
               await kitchenItem.save();
