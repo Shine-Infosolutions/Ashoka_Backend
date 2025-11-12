@@ -341,7 +341,8 @@ exports.getPantryOrders = async (req, res) => {
 
     const orders = await PantryOrder.find(filter)
     .populate("orderedBy", "username email")
-    .populate("vendorId", "name phone email") 
+    .populate("vendorId", "name phone email")
+    .populate("items.itemId", "name unit price")
       .sort({ createdAt: -1 });
 
     res.json({ success: true, orders });
