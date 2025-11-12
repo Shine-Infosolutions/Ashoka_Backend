@@ -426,13 +426,40 @@ exports.updatePantryOrderStatus = async (req, res) => {
         // Populate items to get item details
         await order.populate('items.itemId', 'name unit');
         
-        // Reduce pantry stock for available items only
+        // Reduce pantry stock and add to kitchen store for available items only
         for (const item of order.items) {
-          const availableQty = item.availableQuantity || 0;
+          // Check current pantry stock to determine available quantity
+          const pantryItem = await PantryItem.findById(item.itemId);
+          if (!pantryItem) continue;
+          
+          const availableQty = item.availableQuantity || Math.min(pantryItem.stockQuantity, item.quantity);
+          console.log(`Processing item ${pantryItem.name}: requested=${item.quantity}, available=${availableQty}, pantryStock=${pantryItem.stockQuantity}`);
+          
           if (availableQty > 0) {
+            // Reduce pantry stock
             await PantryItem.findByIdAndUpdate(item.itemId, {
               $inc: { stockQuantity: -Number(availableQty) }
             });
+            
+            // Add to kitchen store
+            let kitchenItem = await KitchenStore.findOne({ 
+              name: pantryItem.name 
+            });
+            
+            if (kitchenItem) {
+              kitchenItem.quantity = Number(kitchenItem.quantity) + Number(availableQty);
+              await kitchenItem.save();
+              console.log(`Updated kitchen store: ${pantryItem.name} quantity now ${kitchenItem.quantity}`);
+            } else {
+              kitchenItem = new KitchenStore({
+                name: pantryItem.name,
+                category: 'Food',
+                quantity: Number(availableQty),
+                unit: pantryItem.unit || 'pcs'
+              });
+              await kitchenItem.save();
+              console.log(`Created new kitchen store item: ${pantryItem.name} with quantity ${availableQty}`);
+            }
           }
         }
         
@@ -458,30 +485,7 @@ exports.updatePantryOrderStatus = async (req, res) => {
           await kitchenOrder.save();
         }
         
-        // Add items to kitchen store
-        for (const orderItem of order.items) {
-          const availableQty = orderItem.availableQuantity || 0;
-          if (availableQty > 0) {
-            let kitchenItem = await KitchenStore.findOne({ 
-              name: orderItem.itemId.name 
-            });
-            
-            if (kitchenItem) {
-              kitchenItem.quantity = Number(kitchenItem.quantity) + Number(availableQty);
-              await kitchenItem.save();
-            } else {
-              kitchenItem = new KitchenStore({
-                name: orderItem.itemId.name,
-                category: 'Food',
-                quantity: Number(availableQty),
-                unit: orderItem.itemId.unit || 'pcs'
-              });
-              await kitchenItem.save();
-            }
-          }
-        }
-        
-        console.log('Kitchen order created and items added to kitchen store');
+        console.log('Kitchen order created and items processed for kitchen store');
         order.status = 'fulfilled';
         order.deliveredAt = new Date();
       } catch (error) {
