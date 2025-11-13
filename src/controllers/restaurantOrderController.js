@@ -7,14 +7,15 @@ const Table = require("../models/Table");
 // Generate KOT number
 const generateKOTNumber = async () => {
   const today = new Date();
-  const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
   const count = await KOT.countDocuments({
     createdAt: {
       $gte: new Date(today.getFullYear(), today.getMonth(), today.getDate()),
-      $lt: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1),
-    },
+      $lt: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1)
+    }
   });
-  return `KOT${dateStr}${String(count + 1).padStart(3, "0")}`;
+  
+  const nextNumber = (count % 9999) + 1;
+  return String(nextNumber).padStart(4, '0');
 };
 
 exports.createOrder = async (req, res) => {
