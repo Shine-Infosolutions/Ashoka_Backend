@@ -52,10 +52,14 @@ exports.createOrder = async (req, res) => {
       })
     );
 
+    // ✅ Calculate total amount
+    const totalAmount = populatedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
     // ✅ Save Order
     const orderData = {
       ...req.body,
       items: populatedItems, // with names & price
+      amount: totalAmount,
       createdBy: req.user?.id,
     };
 
@@ -242,8 +246,6 @@ exports.addItemsToOrder = async (req, res) => {
     const order = await RestaurantOrder.findById(req.params.id);
     if (!order) return res.status(404).json({ error: 'Order not found' });
     
-    let totalAmount = order.amount;
-    
     for (const newItem of items) {
       const itemDetails = await Item.findById(newItem.itemId);
       if (!itemDetails) continue;
@@ -257,15 +259,15 @@ exports.addItemsToOrder = async (req, res) => {
       } else {
         order.items.push({
           itemId: newItem.itemId,
+          itemName: itemDetails.name,
           quantity: newItem.quantity,
           price: itemDetails.Price
         });
       }
-      
-      totalAmount += itemDetails.Price * newItem.quantity;
     }
     
-    order.amount = totalAmount;
+    // Recalculate total amount from all items
+    order.amount = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     await order.save();
     
     // Update existing bill if it exists
