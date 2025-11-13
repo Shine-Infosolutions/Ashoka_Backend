@@ -87,7 +87,7 @@ app.set("io", io);
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:3000",
-  "http://localhost:5000",
+  "https://ashoka-api.shineinfosolutions.in",
   "https://ashoka-backend.vercel.app",
   "https://ashokacrm.vercel.app",
   "https://ashoka-api.shineinfosolutions.in",
