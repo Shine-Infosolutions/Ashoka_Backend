@@ -52,6 +52,7 @@ const kitchenOrderRoutes = require("./src/routes/kitchenRoutes.js");
 const kitchenStoreRoutes = require("./src/routes/kitchenStoreRoutes.js");
 const kitchenConsumptionRoutes = require("./src/routes/kitchenConsumptionRoutes.js");
 const laundryVendorRoutes = require("./src/routes/laundryVendorRoutes.js");
+const nocRoutes = require("./src/routes/nocRoutes.js");
 const roomServiceRoutes = require("./src/routes/roomServiceRoutes.js");
 const { restrictPantryAccess } = require("./src/middleware/authMiddleware.js");
 
@@ -88,7 +89,7 @@ app.set("io", io);
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:3000",
-  "http://localhost:5000",
+  "https://ashoka-api.shineinfosolutions.in",
   "https://ashoka-backend.vercel.app",
   "https://ashokacrm.vercel.app",
   "https://ashoka-api.shineinfosolutions.in",
@@ -184,6 +185,7 @@ app.use("/api/kitchen-orders", kitchenOrderRoutes);
 app.use("/api/kitchen-store", kitchenStoreRoutes);
 app.use("/api/kitchen-consumption", kitchenConsumptionRoutes);
 app.use("/api/laundry-vendors", laundryVendorRoutes);
+app.use("/api/noc", nocRoutes);
 app.use("/api/room-service", roomServiceRoutes);
 app.use("/api/salary", salaryRoutes);
 
