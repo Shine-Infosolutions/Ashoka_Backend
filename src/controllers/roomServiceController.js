@@ -133,7 +133,17 @@ exports.generateKOT = async (req, res) => {
       return res.status(400).json({ message: "KOT already generated" });
     }
 
-    const kotNumber = `KOT${Date.now().toString().slice(-8)}`;
+    // Generate 4-digit KOT number
+    const KOT = require('../models/KOT');
+    const today = new Date();
+    const count = await KOT.countDocuments({
+      createdAt: {
+        $gte: new Date(today.getFullYear(), today.getMonth(), today.getDate()),
+        $lt: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1)
+      }
+    });
+    const nextNumber = (count % 9999) + 1;
+    const kotNumber = String(nextNumber).padStart(4, '0');
     order.kotGenerated = true;
     order.kotNumber = kotNumber;
     order.kotGeneratedAt = new Date();
