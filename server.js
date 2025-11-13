@@ -56,6 +56,7 @@ const nocRoutes = require("./src/routes/nocRoutes.js");
 const roomServiceRoutes = require("./src/routes/roomServiceRoutes.js");
 const gstRoutes = require("./src/routes/gstRoutes.js");
 const { restrictPantryAccess } = require("./src/middleware/authMiddleware.js");
+const gstNumberRoutes = require("./src/routes/gstNumberRoutes.js");
 
 const path = require("path");
 // Initialize express app
@@ -190,6 +191,7 @@ app.use("/api/noc", nocRoutes);
 app.use("/api/room-service", roomServiceRoutes);
 app.use("/api/gst", gstRoutes);
 app.use("/api/salary", salaryRoutes);
+app.use("/api/gst-numbers", gstNumberRoutes);
 
 // Health check endpoint
 app.get("/health", (req, res) => {
