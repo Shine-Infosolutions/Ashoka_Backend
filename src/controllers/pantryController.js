@@ -427,7 +427,7 @@ exports.updatePantryOrderStatus = async (req, res) => {
     order.status = status;
 
     // If Kitchen to Pantry order is approved, reduce pantry stock and update kitchen order
-    if (order.orderType === 'Kitchen to Pantry' && status === 'approved') {
+    if (order.orderType === 'Kitchen to Pantry' && (status === 'approved' || status === 'fulfilled')) {
       console.log('=== PROCESSING KITCHEN TO PANTRY APPROVAL ===');
       console.log('Order ID:', order._id);
       console.log('Order items:', JSON.stringify(order.items, null, 2));
@@ -467,13 +467,31 @@ exports.updatePantryOrderStatus = async (req, res) => {
           if (availableQty > 0) {
             console.log(`Processing ${availableQty} units of ${pantryItem.name}`);
             
-            // Reduce pantry stock
+            // Reduce pantry stock (pantry sends items to kitchen)
             const updatedPantryItem = await PantryItem.findByIdAndUpdate(pantryItem._id, {
               $inc: { stockQuantity: -Number(availableQty) }
             }, { new: true });
-            console.log(`Pantry stock updated: ${pantryItem.name} now has ${updatedPantryItem.stockQuantity}`);
+            console.log(`Pantry stock reduced: ${pantryItem.name} now has ${updatedPantryItem.stockQuantity}`);
             
-            // Add to processed items for kitchen order (DON'T add to kitchen store yet)
+            // Add items to kitchen store (pantry sends to kitchen)
+            let kitchenItem = await KitchenStore.findOne({ name: pantryItem.name });
+            if (kitchenItem) {
+              const oldQuantity = Number(kitchenItem.quantity);
+              kitchenItem.quantity = oldQuantity + availableQty;
+              await kitchenItem.save();
+              console.log(`Updated kitchen store: ${pantryItem.name} ${oldQuantity} + ${availableQty} = ${kitchenItem.quantity}`);
+            } else {
+              kitchenItem = new KitchenStore({
+                name: pantryItem.name,
+                category: pantryItem.category?.name || 'Food',
+                quantity: availableQty,
+                unit: pantryItem.unit || 'pcs'
+              });
+              await kitchenItem.save();
+              console.log(`Created new kitchen store item: ${pantryItem.name} with ${availableQty}`);
+            }
+            
+            // Add to processed items for kitchen order tracking
             processedItems.push({
               itemId: item.itemId,
               quantity: availableQty,
@@ -497,37 +515,6 @@ exports.updatePantryOrderStatus = async (req, res) => {
             }, { new: true });
             console.log('Updated existing kitchen order:', kitchenOrder._id);
         } else {
-          // Add items directly to kitchen store (only if items were processed)
-          if (processedItems.length > 0) {
-            for (const item of processedItems) {
-              const itemName = item.itemId?.name || item.name;
-              const itemUnit = item.itemId?.unit || item.unit || 'pcs';
-              const itemQuantity = Number(item.quantity);
-              
-              if (!itemName || itemQuantity <= 0) {
-                console.log('Skipping invalid item:', item);
-                continue;
-              }
-              
-              let kitchenItem = await KitchenStore.findOne({ name: itemName });
-              
-              if (kitchenItem) {
-                const oldQuantity = Number(kitchenItem.quantity);
-                kitchenItem.quantity = oldQuantity + itemQuantity;
-                await kitchenItem.save();
-                console.log(`Updated kitchen store: ${itemName} ${oldQuantity} + ${itemQuantity} = ${kitchenItem.quantity} ${itemUnit}`);
-              } else {
-                kitchenItem = new KitchenStore({
-                  name: itemName,
-                  category: 'Food',
-                  quantity: itemQuantity,
-                  unit: itemUnit
-                });
-                await kitchenItem.save();
-                console.log(`Created new kitchen store item: ${itemName} with ${itemQuantity} ${itemUnit}`);
-              }
-            }
-          }
           
           // Create kitchen order with delivered status
           kitchenOrder = new KitchenOrder({

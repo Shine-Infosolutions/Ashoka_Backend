@@ -50,6 +50,7 @@ const roomInspectionRoutes = require("./src/routes/roomInspectionRoutes.js");
 const pantryCategoryRoutes = require("./src/routes/pantryCategoryRoutes.js");
 const kitchenOrderRoutes = require("./src/routes/kitchenRoutes.js");
 const kitchenStoreRoutes = require("./src/routes/kitchenStoreRoutes.js");
+const kitchenConsumptionRoutes = require("./src/routes/kitchenConsumptionRoutes.js");
 const laundryVendorRoutes = require("./src/routes/laundryVendorRoutes.js");
 const roomServiceRoutes = require("./src/routes/roomServiceRoutes.js");
 const { restrictPantryAccess } = require("./src/middleware/authMiddleware.js");
@@ -181,6 +182,7 @@ app.use("/api/room-inspections", roomInspectionRoutes);
 app.use("/api/pantry-categories", pantryCategoryRoutes);
 app.use("/api/kitchen-orders", kitchenOrderRoutes);
 app.use("/api/kitchen-store", kitchenStoreRoutes);
+app.use("/api/kitchen-consumption", kitchenConsumptionRoutes);
 app.use("/api/laundry-vendors", laundryVendorRoutes);
 app.use("/api/room-service", roomServiceRoutes);
 app.use("/api/salary", salaryRoutes);
@@ -228,48 +230,15 @@ io.on("connection", (socket) => {
     console.log(`📨 Test message received from ${socket.id}:`, data);
     socket.emit("test-response", { message: "Hello from server!", timestamp: new Date() });
   });
-  
+ 
   socket.on("disconnect", (reason) => {
     console.log(`❌ Client disconnected: ${socket.id}, reason: ${reason}`);
   });
 });
 
-// WebSocket server for Banquet
-const wss = new WebSocket.Server({
-  server,
-  path: "/banquet-ws",
-});
-
-wss.on("connection", (ws) => {
-  console.log("WebSocket connected");
-
-  ws.on("message", (message) => {
-    try {
-      const data = JSON.parse(message);
-      console.log("WebSocket message:", data.type);
-
-      // Broadcast to all WebSocket clients
-      wss.clients.forEach((client) => {
-        if (client !== ws && client.readyState === WebSocket.OPEN) {
-          client.send(JSON.stringify(data));
-        }
-      });
-    } catch (error) {
-      console.error("WebSocket message error:", error);
-    }
-  });
-
-  ws.on("close", () => {
-    console.log("WebSocket disconnected");
-  });
-
-  // Send welcome message
-  ws.send(
-    JSON.stringify({
-      type: "CONNECTION_ESTABLISHED",
-      message: "Connected to Banquet WebSocket",
-    })
-  );
+// Banquet updates via Socket.io
+io.on('banquet-update', (data) => {
+  io.emit('banquet-notification', data);
 });
 
 if (process.env.NODE_ENV !== "production") {

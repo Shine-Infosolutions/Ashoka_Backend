@@ -1,12 +1,42 @@
 const KitchenOrder = require('../models/KitchenOrder');
 
-// Get all kitchen orders
+// Get all kitchen orders with pagination and filtering
 const getAllKitchenOrders = async (req, res) => {
   try {
-    const orders = await KitchenOrder.find()
+    const { page = 1, limit = 50, status, orderType, legacy } = req.query;
+    const filter = {};
+    
+    if (status) filter.status = status;
+    if (orderType) filter.orderType = orderType;
+    
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    const orders = await KitchenOrder.find(filter)
+      .select('items totalAmount status orderType specialInstructions orderedBy createdAt receivedAt pantryOrderId')
       .populate('items.itemId', 'name unit')
-      .populate('vendorId', 'name');
-    res.json(orders);
+      .populate('vendorId', 'name')
+      .populate('orderedBy', 'username')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean();
+      
+    // For backward compatibility, return just orders array if legacy=true
+    if (legacy === 'true') {
+      return res.json(orders);
+    }
+      
+    const total = await KitchenOrder.countDocuments(filter);
+    
+    res.json({
+      orders,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
   } catch (error) {
     console.error('Kitchen orders fetch error:', error);
     res.status(500).json({ message: error.message });
@@ -18,7 +48,9 @@ const getKitchenOrderById = async (req, res) => {
   try {
     const order = await KitchenOrder.findById(req.params.id)
       .populate('items.itemId', 'name unit')
-      .populate('vendorId', 'name');
+      .populate('vendorId', 'name')
+      .populate('orderedBy', 'username email')
+      .lean();
     if (!order) {
       return res.status(404).json({ message: 'Kitchen order not found' });
     }
@@ -97,12 +129,13 @@ const updateKitchenOrder = async (req, res) => {
       return res.status(404).json({ message: 'Kitchen order not found' });
     }
 
-    // Update kitchen store when items are received from pantry
+    // Update kitchen store and pantry stock when items are received from pantry
     if (req.body.status === 'delivered' && (order.orderType === 'kitchen_to_pantry' || order.orderType === 'pantry_to_kitchen') && order.items && order.items.length > 0) {
       try {
         const KitchenStore = require('../models/KitchenStore');
+        const PantryItem = require('../models/PantryItem');
         
-        console.log(`Updating kitchen store for ${order.orderType} order:`, order._id);
+        console.log(`Updating kitchen store and pantry stock for ${order.orderType} order:`, order._id);
         
         for (const orderItem of order.items) {
           const itemName = orderItem.itemId?.name || orderItem.name;
@@ -114,6 +147,18 @@ const updateKitchenOrder = async (req, res) => {
             continue;
           }
           
+          // Reduce pantry stock (pantry sends items to kitchen)
+          const pantryItem = await PantryItem.findOne({ name: itemName });
+          if (pantryItem && pantryItem.stockQuantity >= itemQuantity) {
+            const oldPantryStock = pantryItem.stockQuantity;
+            pantryItem.stockQuantity -= itemQuantity;
+            await pantryItem.save();
+            console.log(`Reduced pantry stock: ${itemName} ${oldPantryStock} - ${itemQuantity} = ${pantryItem.stockQuantity}`);
+          } else {
+            console.log(`Warning: Insufficient pantry stock for ${itemName}. Available: ${pantryItem?.stockQuantity || 0}, Required: ${itemQuantity}`);
+          }
+          
+          // Add to kitchen store
           let kitchenItem = await KitchenStore.findOne({ 
             name: itemName 
           });
@@ -134,9 +179,9 @@ const updateKitchenOrder = async (req, res) => {
             console.log(`Created new kitchen store item: ${itemName} with ${itemQuantity} ${itemUnit}`);
           }
         }
-        console.log('Kitchen store update completed successfully');
+        console.log('Kitchen store and pantry stock update completed successfully');
       } catch (kitchenStoreError) {
-        console.error('Failed to update kitchen store:', kitchenStoreError.message);
+        console.error('Failed to update kitchen store and pantry stock:', kitchenStoreError.message);
         console.error('Kitchen store error stack:', kitchenStoreError.stack);
       }
     }
