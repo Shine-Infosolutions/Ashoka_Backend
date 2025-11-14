@@ -33,9 +33,20 @@ const BillSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['cash', 'card', 'upi'],
+    enum: ['cash', 'card', 'upi', 'split'],
     required: true
   },
+  splitPayments: [{
+    method: {
+      type: String,
+      enum: ['cash', 'card', 'upi'],
+      required: true
+    },
+    amount: {
+      type: Number,
+      required: true
+    }
+  }],
   paymentStatus: {
     type: String,
     enum: ['pending', 'paid'],
