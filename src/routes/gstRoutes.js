@@ -4,6 +4,7 @@ const {
   createGST, 
   getAllGSTs, 
   getGSTById, 
+  getGSTDetails,
   updateGST, 
   deleteGST 
 } = require('../controllers/gstController');
@@ -11,6 +12,7 @@ const {
 // GST routes
 router.post('/create', createGST);
 router.get('/all', getAllGSTs);
+router.get('/details/:gstNumber', getGSTDetails);
 router.get('/:id', getGSTById);
 router.put('/update/:id', updateGST);
 router.delete('/delete/:id', deleteGST);
