@@ -27,6 +27,12 @@ exports.getAllTables = async (req, res) => {
 // Create table
 exports.createTable = async (req, res) => {
   try {
+    const { capacity } = req.body;
+    
+    if (capacity && capacity > 4) {
+      return res.status(400).json({ error: 'Table capacity cannot exceed 4 people' });
+    }
+    
     const table = new Table(req.body);
     await table.save();
     
@@ -48,6 +54,12 @@ exports.createTable = async (req, res) => {
 exports.updateTable = async (req, res) => {
   try {
     const { tableId } = req.params;
+    const { capacity } = req.body;
+    
+    if (capacity && capacity > 4) {
+      return res.status(400).json({ error: 'Table capacity cannot exceed 4 people' });
+    }
+    
     const table = await Table.findByIdAndUpdate(tableId, req.body, { new: true });
     
     if (!table) {
