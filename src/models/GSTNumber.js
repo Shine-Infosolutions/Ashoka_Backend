@@ -1,20 +1,38 @@
 const mongoose = require('mongoose');
 
 const gstNumberSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    trim: true
+  },
+  address: {
+    type: String,
+    trim: true
+  },
+  city: {
+    type: String,
+    trim: true
+  },
+  company: {
+    type: String,
+    trim: true
+  },
+  mobileNumber: {
+    type: String,
+    match: [/^[0-9]{10}$/, 'Mobile number must be 10 digits']
+  },
   gstNumber: {
     type: String,
-    required: true,
-    unique: true,
-    match: /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/
+    trim: true,
+    uppercase: true
   },
-  companyName: {
-    type: String,
-    required: true
-  },
-  isActive: {
-    type: Boolean,
-    default: true
-  }
+
 }, { timestamps: true });
+
+// Indexes
+gstNumberSchema.index({ gstNumber: 1 });
+gstNumberSchema.index({ mobileNumber: 1 });
+gstNumberSchema.index({ company: 1 });
+gstNumberSchema.index({ city: 1 });
 
 module.exports = mongoose.model('GSTNumber', gstNumberSchema);

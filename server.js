@@ -57,6 +57,7 @@ const roomServiceRoutes = require("./src/routes/roomServiceRoutes.js");
 const gstRoutes = require("./src/routes/gstRoutes.js");
 const { restrictPantryAccess } = require("./src/middleware/authMiddleware.js");
 const gstNumberRoutes = require("./src/routes/gstNumberRoutes.js");
+const restaurantInvoiceRoutes = require("./src/routes/restaurantInvoiceRoutes.js");
 
 const path = require("path");
 // Initialize express app
@@ -192,6 +193,7 @@ app.use("/api/room-service", roomServiceRoutes);
 app.use("/api/gst", gstRoutes);
 app.use("/api/salary", salaryRoutes);
 app.use("/api/gst-numbers", gstNumberRoutes);
+app.use("/api/restaurant-invoices", restaurantInvoiceRoutes);
 
 // Health check endpoint
 app.get("/health", (req, res) => {
