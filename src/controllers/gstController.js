@@ -51,11 +51,33 @@ const getGSTById = async (req, res) => {
   }
 };
 
-// Get GST details by GST Number (auto-fill)
+// Get GST details by GST Number (auto-fill and save)
 const getGSTDetails = async (req, res) => {
   try {
     const { gstNumber } = req.params;
+    const { name, address, city, company, mobileNumber } = req.query;
     
+    // If query parameters provided, save/update the GST details
+    if (name || address || city || company || mobileNumber) {
+      const gst = await GST.findOneAndUpdate(
+        { gstNumber },
+        { 
+          name: name || undefined,
+          address: address || undefined,
+          city: city || undefined,
+          company: company || undefined,
+          mobileNumber: mobileNumber || undefined,
+          gstNumber,
+          totalGST: 18,
+          cgst: 9,
+          sgst: 9
+        },
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+      );
+      return res.json({ success: true, message: 'GST details saved', gst });
+    }
+    
+    // Otherwise fetch existing details
     const existingGST = await GST.findOne({ gstNumber, isActive: true });
     if (!existingGST) {
       return res.status(404).json({ success: false, error: 'GST not found' });
