@@ -31,6 +31,13 @@ const BillSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
+  advancePayment: {
+    type: Number,
+    default: 0
+  },
+  remainingAmount: {
+    type: Number
+  },
   paymentMethod: {
     type: String,
     enum: ['cash', 'card', 'upi', 'split'],

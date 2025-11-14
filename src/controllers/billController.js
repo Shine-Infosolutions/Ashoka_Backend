@@ -1,5 +1,6 @@
 const Bill = require('../models/Bill');
 const RestaurantOrder = require('../models/RestaurantOrder');
+const RestaurantReservation = require('../models/RestaurantReservation');
 
 // Generate bill number
 const generateBillNumber = async (isRoomService = false) => {
@@ -19,10 +20,21 @@ const generateBillNumber = async (isRoomService = false) => {
 // Create bill from order
 exports.createBill = async (req, res) => {
   try {
-    const { orderId, discount, tax, paymentMethod } = req.body;
+    const { orderId, discount, tax, paymentMethod, reservationId } = req.body;
     
     const order = await RestaurantOrder.findById(orderId);
     if (!order) return res.status(404).json({ error: 'Order not found' });
+    
+    let advanceAmount = 0;
+    let reservation = null;
+    
+    // Check for reservation advance payment
+    if (reservationId) {
+      reservation = await RestaurantReservation.findById(reservationId);
+      if (reservation && !reservation.isAdvanceAdjusted) {
+        advanceAmount = reservation.advancePayment || 0;
+      }
+    }
     
     // Check if this is a room service order (tableNo starts with 'R')
     const isRoomService = order.tableNo && order.tableNo.startsWith('R');
@@ -31,6 +43,7 @@ exports.createBill = async (req, res) => {
     const discountAmount = discount || 0;
     const taxAmount = tax || 0;
     const totalAmount = subtotal - discountAmount + taxAmount;
+    const remainingAmount = Math.max(0, totalAmount - advanceAmount);
     
     const bill = new Bill({
       orderId,
@@ -40,12 +53,26 @@ exports.createBill = async (req, res) => {
       discount: discountAmount,
       tax: taxAmount,
       totalAmount,
+      advancePayment: advanceAmount,
+      remainingAmount,
       paymentMethod,
       cashierId: req.user?.id || req.user?._id
     });
     
     await bill.save();
-    res.status(201).json(bill);
+    
+    // Mark advance as adjusted
+    if (reservation && advanceAmount > 0) {
+      reservation.isAdvanceAdjusted = true;
+      reservation.adjustedInBill = bill._id;
+      await reservation.save();
+    }
+    
+    res.status(201).json({
+      ...bill.toObject(),
+      advanceAdjusted: advanceAmount,
+      pendingAmount: remainingAmount
+    });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -58,8 +85,9 @@ exports.processPayment = async (req, res) => {
     const bill = await Bill.findById(req.params.id);
     if (!bill) return res.status(404).json({ error: 'Bill not found' });
     
-    const changeAmount = paidAmount > bill.totalAmount ? paidAmount - bill.totalAmount : 0;
-    const paymentStatus = paidAmount >= bill.totalAmount ? 'paid' : 'pending';
+    const remainingAmount = bill.remainingAmount || bill.totalAmount;
+    const changeAmount = paidAmount > remainingAmount ? paidAmount - remainingAmount : 0;
+    const paymentStatus = paidAmount >= remainingAmount ? 'paid' : 'pending';
     
     bill.paidAmount = paidAmount;
     bill.changeAmount = changeAmount;
@@ -97,7 +125,13 @@ exports.processPayment = async (req, res) => {
       }
     }
     
-    res.json(bill);
+    res.json({
+      ...bill.toObject(),
+      totalBillAmount: bill.totalAmount,
+      advanceAdjusted: bill.advancePayment || 0,
+      amountPaidNow: paidAmount,
+      changeReturned: changeAmount
+    });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -295,5 +329,39 @@ exports.updateBillStatus = async (req, res) => {
     res.json(bill);
   } catch (error) {
     res.status(400).json({ error: error.message });
+  }
+};
+
+// Get bill with advance payment details
+exports.getBillWithAdvanceDetails = async (req, res) => {
+  try {
+    const bill = await Bill.findById(req.params.id)
+      .populate('orderId')
+      .populate('cashierId', 'username');
+    
+    if (!bill) return res.status(404).json({ error: 'Bill not found' });
+    
+    let reservation = null;
+    if (bill.advancePayment > 0) {
+      reservation = await RestaurantReservation.findOne({ adjustedInBill: bill._id });
+    }
+    
+    res.json({
+      ...bill.toObject(),
+      reservation: reservation ? {
+        reservationNumber: reservation.reservationNumber,
+        guestName: reservation.guestName,
+        advancePayment: reservation.advancePayment
+      } : null,
+      paymentBreakdown: {
+        totalBill: bill.totalAmount,
+        advanceAdjusted: bill.advancePayment || 0,
+        remainingAmount: bill.remainingAmount || bill.totalAmount,
+        paidAmount: bill.paidAmount || 0,
+        changeAmount: bill.changeAmount || 0
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 };
