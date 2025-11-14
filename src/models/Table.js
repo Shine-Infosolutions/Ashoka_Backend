@@ -25,6 +25,19 @@ const TableSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
+  },
+  mergedWith: [{
+    type: String,
+    ref: 'Table'
+  }],
+  mergeGroup: {
+    type: String,
+    default: null
+  },
+  masterOrderId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'RestaurantOrder',
+    default: null
   }
 }, { timestamps: true });
 
