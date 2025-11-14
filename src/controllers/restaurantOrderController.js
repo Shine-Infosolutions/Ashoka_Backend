@@ -398,49 +398,42 @@ exports.updateOrderStatus = async (req, res) => {
       });
     }
 
-    // Update table status when order is served AND paid
-    const previousStatus = order.status; // Store previous status before update
+    // Auto-release table when order is both served and paid
+    const shouldReleaseTable = async () => {
+      // Get all orders for this table
+      const tableOrders = await RestaurantOrder.find({ tableNo: order.tableNo });
+      
+      // Check if all orders for this table are both served and paid
+      const allOrdersComplete = tableOrders.every(tableOrder => 
+        (tableOrder.status === 'served' || tableOrder.status === 'paid' || tableOrder.status === 'completed') &&
+        (tableOrder._id.toString() === order._id.toString() ? 
+          (status === 'served' || status === 'paid' || status === 'completed') : true)
+      );
+      
+      if (allOrdersComplete) {
+        try {
+          const table = await Table.findOneAndUpdate(
+            { tableNumber: order.tableNo },
+            { status: 'available' },
+            { new: true }
+          );
+          if (table && io) {
+            console.log(`Table ${table.tableNumber} automatically released - all orders complete`);
+            io.to('waiters').emit('table-status-updated', {
+              tableId: table._id,
+              tableNumber: table.tableNumber,
+              status: 'available'
+            });
+          }
+        } catch (tableError) {
+          console.error('Error auto-releasing table:', tableError);
+        }
+      }
+    };
     
-    if (status === 'paid') {
-      // Check if order was previously served before making table available
-      if (previousStatus === 'served') {
-        try {
-          const table = await Table.findOneAndUpdate(
-            { tableNumber: order.tableNo },
-            { status: 'available' },
-            { new: true }
-          );
-          if (table && io) {
-            io.to('waiters').emit('table-status-updated', {
-              tableId: table._id,
-              tableNumber: table.tableNumber,
-              status: 'available'
-            });
-          }
-        } catch (tableError) {
-          console.error('Error updating table status:', tableError);
-        }
-      }
-    } else if (status === 'served') {
-      // Check if order is already paid before making table available
-      if (previousStatus === 'paid') {
-        try {
-          const table = await Table.findOneAndUpdate(
-            { tableNumber: order.tableNo },
-            { status: 'available' },
-            { new: true }
-          );
-          if (table && io) {
-            io.to('waiters').emit('table-status-updated', {
-              tableId: table._id,
-              tableNumber: table.tableNumber,
-              status: 'available'
-            });
-          }
-        } catch (tableError) {
-          console.error('Error updating table status:', tableError);
-        }
-      }
+    // Check if table should be released when order status changes to served, paid, or completed
+    if (['served', 'paid', 'completed'].includes(status)) {
+      await shouldReleaseTable();
     }
     
     res.json(order);
