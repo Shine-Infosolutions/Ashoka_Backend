@@ -3,16 +3,16 @@ const Item = require('../models/Items');
 const itemController = {
   getAllItems: async (req, res) => {
     try {
-      const items = await Item.find({ status: 'available' });
+      const items = await Item.find();
       res.json(items);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
   },
 
-  getAllItemsForAdmin: async (req, res) => {
+  getAvailableItems: async (req, res) => {
     try {
-      const items = await Item.find();
+      const items = await Item.find({ status: 'available' });
       res.json(items);
     } catch (error) {
       res.status(500).json({ error: error.message });
