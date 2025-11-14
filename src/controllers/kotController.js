@@ -13,8 +13,20 @@ const generateKOTNumber = async () => {
     }
   });
   
-  const nextNumber = (count % 9999) + 1;
-  return String(nextNumber).padStart(4, '0');
+  const nextNumber = (count % 999) + 1;
+  const sequentialNumber = String(nextNumber).padStart(3, '0');
+  const dateStr = today.getFullYear().toString() + 
+                  String(today.getMonth() + 1).padStart(2, '0') + 
+                  String(today.getDate()).padStart(2, '0');
+  
+  return `KOT${dateStr}${sequentialNumber}`;
+};
+
+// Extract display number from KOT number
+const getKOTDisplayNumber = (kotNumber) => {
+  if (!kotNumber) return '000';
+  // Extract last 3 digits from KKOT20251113001 format
+  return kotNumber.slice(-3);
 };
 
 // Create KOT from order
@@ -63,7 +75,10 @@ exports.createKOT = async (req, res) => {
       });
     }
     
-    res.status(201).json(kot);
+    res.status(201).json({
+      ...kot.toObject(),
+      displayNumber: getKOTDisplayNumber(kot.kotNumber)
+    });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -82,7 +97,11 @@ exports.getAllKOTs = async (req, res) => {
       .populate('createdBy', 'username')
       .populate('assignedChef', 'username')
       .sort({ createdAt: -1 });
-    res.json(kots);
+    const kotsWithDisplayNumber = kots.map(kot => ({
+      ...kot.toObject(),
+      displayNumber: getKOTDisplayNumber(kot.kotNumber)
+    }));
+    res.json(kotsWithDisplayNumber);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -131,7 +150,10 @@ exports.updateKOTStatus = async (req, res) => {
       }
     }
     
-    res.json(kot);
+    res.json({
+      ...kot.toObject(),
+      displayNumber: getKOTDisplayNumber(kot.kotNumber)
+    });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -146,7 +168,10 @@ exports.getKOTById = async (req, res) => {
       .populate('createdBy', 'username')
       .populate('assignedChef', 'username');
     if (!kot) return res.status(404).json({ error: 'KOT not found' });
-    res.json(kot);
+    res.json({
+      ...kot.toObject(),
+      displayNumber: getKOTDisplayNumber(kot.kotNumber)
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -202,7 +227,10 @@ exports.updateKOT = async (req, res) => {
       .populate('createdBy', 'username')
       .populate('assignedChef', 'username');
     if (!kot) return res.status(404).json({ error: 'KOT not found' });
-    res.json(kot);
+    res.json({
+      ...kot.toObject(),
+      displayNumber: getKOTDisplayNumber(kot.kotNumber)
+    });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
