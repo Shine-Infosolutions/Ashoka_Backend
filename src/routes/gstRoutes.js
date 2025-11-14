@@ -3,16 +3,14 @@ const router = express.Router();
 const { 
   createGST, 
   getAllGSTs, 
-  getGSTById, 
-  getGSTDetails,
+  getGSTById,
   updateGST, 
   deleteGST 
 } = require('../controllers/gstController');
 
-// GST routes
+// GST Rate routes
 router.post('/create', createGST);
 router.get('/all', getAllGSTs);
-router.get('/details/:gstNumber', getGSTDetails);
 router.get('/:id', getGSTById);
 router.put('/update/:id', updateGST);
 router.delete('/delete/:id', deleteGST);

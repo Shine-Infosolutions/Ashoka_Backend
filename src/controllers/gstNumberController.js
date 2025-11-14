@@ -1,17 +1,21 @@
 const GSTNumber = require('../models/GSTNumber');
 
-// Create GST Number
+// Create GST Number (Customer/Company)
 const createGSTNumber = async (req, res) => {
   try {
-    const { gstNumber, companyName } = req.body;
+    const { name, address, city, company, mobileNumber, gstNumber } = req.body;
     
-    const gst = new GSTNumber({
-      gstNumber,
-      companyName
+    const gstNumberRecord = new GSTNumber({
+      name,
+      address,
+      city,
+      company,
+      mobileNumber,
+      gstNumber
     });
     
-    await gst.save();
-    res.status(201).json({ success: true, gst });
+    await gstNumberRecord.save();
+    res.status(201).json({ success: true, gstNumber: gstNumberRecord });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }
@@ -20,7 +24,7 @@ const createGSTNumber = async (req, res) => {
 // Get all GST Numbers
 const getAllGSTNumbers = async (req, res) => {
   try {
-    const gstNumbers = await GSTNumber.find({ isActive: true });
+    const gstNumbers = await GSTNumber.find();
     res.json({ success: true, gstNumbers });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -31,13 +35,29 @@ const getAllGSTNumbers = async (req, res) => {
 const getGSTNumberById = async (req, res) => {
   try {
     const { id } = req.params;
-    const gst = await GSTNumber.findById(id);
+    const gstNumber = await GSTNumber.findById(id);
     
-    if (!gst) {
+    if (!gstNumber) {
       return res.status(404).json({ success: false, error: 'GST Number not found' });
     }
     
-    res.json({ success: true, gst });
+    res.json({ success: true, gstNumber });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Get GST details by GST Number (auto-fill)
+const getGSTDetails = async (req, res) => {
+  try {
+    const { gstNumber } = req.params;
+    
+    const existingGST = await GSTNumber.findOne({ gstNumber });
+    if (!existingGST) {
+      return res.status(404).json({ success: false, error: 'GST Number not found' });
+    }
+    
+    res.json({ success: true, gstNumber: existingGST });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -49,24 +69,24 @@ const updateGSTNumber = async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
     
-    const gst = await GSTNumber.findByIdAndUpdate(id, updates, { new: true });
-    if (!gst) {
+    const gstNumber = await GSTNumber.findByIdAndUpdate(id, updates, { new: true });
+    if (!gstNumber) {
       return res.status(404).json({ success: false, error: 'GST Number not found' });
     }
     
-    res.json({ success: true, gst });
+    res.json({ success: true, gstNumber });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }
 };
 
-// Delete GST Number
+// Delete GST Number (soft delete)
 const deleteGSTNumber = async (req, res) => {
   try {
     const { id } = req.params;
-    const gst = await GSTNumber.findByIdAndUpdate(id, { isActive: false }, { new: true });
+    const gstNumber = await GSTNumber.findByIdAndDelete(id);
     
-    if (!gst) {
+    if (!gstNumber) {
       return res.status(404).json({ success: false, error: 'GST Number not found' });
     }
     
@@ -80,6 +100,7 @@ module.exports = {
   createGSTNumber,
   getAllGSTNumbers,
   getGSTNumberById,
+  getGSTDetails,
   updateGSTNumber,
   deleteGSTNumber
 };

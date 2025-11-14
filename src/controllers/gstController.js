@@ -1,21 +1,15 @@
 const GST = require('../models/GST');
 const axios = require('axios');
 
-// Create GST
+// Create GST Rate
 const createGST = async (req, res) => {
   try {
-    const { totalGST, cgst, sgst, name, address, city, company, mobileNumber, gstNumber } = req.body;
+    const { totalGST, cgst, sgst } = req.body;
     
     const gst = new GST({
       totalGST,
       cgst,
-      sgst,
-      name,
-      address,
-      city,
-      company,
-      mobileNumber,
-      gstNumber
+      sgst
     });
     
     await gst.save();
@@ -28,7 +22,7 @@ const createGST = async (req, res) => {
 // Get all GSTs
 const getAllGSTs = async (req, res) => {
   try {
-    const gsts = await GST.find({ isActive: true });
+    const gsts = await GST.find();
     res.json({ success: true, gsts });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -51,21 +45,7 @@ const getGSTById = async (req, res) => {
   }
 };
 
-// Get GST details by GST Number (auto-fill)
-const getGSTDetails = async (req, res) => {
-  try {
-    const { gstNumber } = req.params;
-    
-    const existingGST = await GST.findOne({ gstNumber, isActive: true });
-    if (!existingGST) {
-      return res.status(404).json({ success: false, error: 'GST not found' });
-    }
-    
-    res.json({ success: true, gst: existingGST });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-};
+
 
 // Update GST
 const updateGST = async (req, res) => {
@@ -88,7 +68,7 @@ const updateGST = async (req, res) => {
 const deleteGST = async (req, res) => {
   try {
     const { id } = req.params;
-    const gst = await GST.findByIdAndUpdate(id, { isActive: false }, { new: true });
+    const gst = await GST.findByIdAndDelete(id);
     
     if (!gst) {
       return res.status(404).json({ success: false, error: 'GST not found' });
@@ -104,7 +84,6 @@ module.exports = {
   createGST,
   getAllGSTs,
   getGSTById,
-  getGSTDetails,
   updateGST,
   deleteGST
 };
