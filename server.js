@@ -70,7 +70,7 @@ const io = new Server(server, {
         "http://localhost:3000",
         "https://ashokacrm.vercel.app",
         "https://zomato-frontend-mocha.vercel.app",
-        "http://localhost:5000",
+        "https://ashoka-api.shineinfosolutions.in",
       ];
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
@@ -91,10 +91,10 @@ app.set("io", io);
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:3000",
-  "http://localhost:5000",
+  "https://ashoka-api.shineinfosolutions.in",
   "https://ashoka-backend.vercel.app",
   "https://ashokacrm.vercel.app",
-  "http://localhost:5000",
+  "https://ashoka-api.shineinfosolutions.in",
 ];
 app.use(
   cors({

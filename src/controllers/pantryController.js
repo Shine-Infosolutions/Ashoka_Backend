@@ -364,12 +364,44 @@ exports.getPantryOrders = async (req, res) => {
     if (status) filter.status = status;
 
     const orders = await PantryOrder.find(filter)
-    .populate("orderedBy", "username email")
-    .populate("vendorId", "name phone email")
-    .populate("items.itemId", "name unit price")
+      .populate("orderedBy", "username email")
+      .populate("vendorId", "name phone email")
+      .populate({
+        path: "items.itemId",
+        select: "name unit price costPerUnit description category",
+        populate: {
+          path: "category",
+          select: "name"
+        }
+      })
       .sort({ createdAt: -1 });
 
-    res.json({ success: true, orders });
+    // Handle deleted items by adding fallback names
+    const ordersWithFallback = orders.map(order => {
+      const orderObj = order.toObject();
+      orderObj.items = orderObj.items.map(item => {
+        if (!item.itemId || !item.itemId.name) {
+          // Check if we have original request data
+          const originalItem = order.originalRequest?.items?.find(orig => 
+            orig.itemId === (item.itemId?._id?.toString() || item.itemId?.toString())
+          );
+          
+          return {
+            ...item,
+            itemId: {
+              _id: item.itemId?._id || item.itemId,
+              name: originalItem?.name || 'Deleted Item',
+              unit: originalItem?.unit || item.unit || 'pcs',
+              price: item.unitPrice || 0
+            }
+          };
+        }
+        return item;
+      });
+      return orderObj;
+    });
+
+    res.json({ success: true, orders: ordersWithFallback });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -657,6 +689,53 @@ exports.generateLowStockInvoice = async (req, res) => {
       )
     };
     res.json({ success: true, invoice });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Get pantry order by ID
+exports.getPantryOrderById = async (req, res) => {
+  try {
+    const order = await PantryOrder.findById(req.params.id)
+      .populate("orderedBy", "username email")
+      .populate("vendorId", "name phone email")
+      .populate({
+        path: "items.itemId",
+        select: "name unit price costPerUnit description category",
+        populate: {
+          path: "category",
+          select: "name"
+        }
+      });
+
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    // Handle deleted items by adding fallback names
+    const orderObj = order.toObject();
+    orderObj.items = orderObj.items.map(item => {
+      if (!item.itemId || !item.itemId.name) {
+        // Check if we have original request data
+        const originalItem = order.originalRequest?.items?.find(orig => 
+          orig.itemId === (item.itemId?._id?.toString() || item.itemId?.toString())
+        );
+        
+        return {
+          ...item,
+          itemId: {
+            _id: item.itemId?._id || item.itemId,
+            name: originalItem?.name || 'Deleted Item',
+            unit: originalItem?.unit || item.unit || 'pcs',
+            price: item.unitPrice || 0
+          }
+        };
+      }
+      return item;
+    });
+
+    res.json({ success: true, order: orderObj });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

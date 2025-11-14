@@ -59,6 +59,12 @@ router.get(
   pantryController.getPantryOrders
 );
 
+router.get(
+  "/orders/:id",
+  authMiddleware(["admin", "staff", "pantry"]),
+  pantryController.getPantryOrderById
+);
+
 router.post(
   "/orders",
   authMiddleware(["admin", "staff", "pantry"], ["kitchen", "pantry"]),
