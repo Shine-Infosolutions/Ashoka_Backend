@@ -133,6 +133,81 @@ exports.updateTableStatusByNumber = async (req, res) => {
   }
 };
 
+// Merge tables
+exports.mergeTables = async (req, res) => {
+  try {
+    const { tableNumbers } = req.body;
+    
+    if (!tableNumbers || tableNumbers.length < 2) {
+      return res.status(400).json({ error: 'At least 2 tables required for merging' });
+    }
+    
+    const mergeGroup = `merge_${Date.now()}`;
+    
+    // Update all tables to be merged
+    await Table.updateMany(
+      { tableNumber: { $in: tableNumbers } },
+      { 
+        mergedWith: tableNumbers.filter(num => num !== tableNumbers[0]),
+        mergeGroup: mergeGroup,
+        status: 'occupied'
+      }
+    );
+    
+    const tables = await Table.find({ tableNumber: { $in: tableNumbers } });
+    
+    // WebSocket: Emit merge update
+    const io = req.app.get('io');
+    if (io) {
+      tables.forEach(table => {
+        io.to('waiters').emit('table-status-updated', {
+          tableId: table._id,
+          tableNumber: table.tableNumber,
+          status: 'occupied'
+        });
+      });
+    }
+    
+    res.json({ success: true, message: 'Tables merged successfully', mergeGroup });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
+// Unmerge tables
+exports.unmergeTables = async (req, res) => {
+  try {
+    const { mergeGroup } = req.body;
+    
+    // Update all tables in the merge group
+    await Table.updateMany(
+      { mergeGroup: mergeGroup },
+      { 
+        $unset: { mergedWith: 1, mergeGroup: 1, masterOrderId: 1 },
+        status: 'available'
+      }
+    );
+    
+    const tables = await Table.find({ mergeGroup: mergeGroup });
+    
+    // WebSocket: Emit unmerge update
+    const io = req.app.get('io');
+    if (io) {
+      tables.forEach(table => {
+        io.to('waiters').emit('table-status-updated', {
+          tableId: table._id,
+          tableNumber: table.tableNumber,
+          status: 'available'
+        });
+      });
+    }
+    
+    res.json({ success: true, message: 'Tables unmerged successfully' });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
 // Delete table
 exports.deleteTable = async (req, res) => {
   try {
