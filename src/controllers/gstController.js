@@ -1,14 +1,21 @@
 const GST = require('../models/GST');
+const axios = require('axios');
 
 // Create GST
 const createGST = async (req, res) => {
   try {
-    const { totalGST, cgst, sgst } = req.body;
+    const { totalGST, cgst, sgst, name, address, city, company, mobileNumber, gstNumber } = req.body;
     
     const gst = new GST({
       totalGST,
       cgst,
-      sgst
+      sgst,
+      name,
+      address,
+      city,
+      company,
+      mobileNumber,
+      gstNumber
     });
     
     await gst.save();
@@ -39,6 +46,22 @@ const getGSTById = async (req, res) => {
     }
     
     res.json({ success: true, gst });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Get GST details by GST Number (auto-fill)
+const getGSTDetails = async (req, res) => {
+  try {
+    const { gstNumber } = req.params;
+    
+    const existingGST = await GST.findOne({ gstNumber, isActive: true });
+    if (!existingGST) {
+      return res.status(404).json({ success: false, error: 'GST not found' });
+    }
+    
+    res.json({ success: true, gst: existingGST });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -81,6 +104,7 @@ module.exports = {
   createGST,
   getAllGSTs,
   getGSTById,
+  getGSTDetails,
   updateGST,
   deleteGST
 };
