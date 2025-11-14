@@ -12,17 +12,11 @@ router.post('/tables', authMiddleware(['admin']), tableController.createTable);
 // Update table
 router.put('/tables/:tableId', authMiddleware(['admin']), tableController.updateTable);
 
-// Merge tables (must be before parameterized routes)
-router.post('/tables/merge', authMiddleware(['admin', 'staff', 'restaurant']), tableController.mergeTables);
-
-// Unmerge tables
-router.post('/tables/unmerge', authMiddleware(['admin', 'staff', 'restaurant']), tableController.unmergeTables);
+// Update table status
+router.patch('/tables/:tableId/status', authMiddleware(['admin', 'staff', 'restaurant']), tableController.updateTableStatus);
 
 // Update table status by table number
 router.patch('/tables/status', authMiddleware(['admin', 'staff', 'restaurant']), tableController.updateTableStatusByNumber);
-
-// Update table status
-router.patch('/tables/:tableId/status', authMiddleware(['admin', 'staff', 'restaurant']), tableController.updateTableStatus);
 
 // Delete table
 router.delete('/tables/:tableId', authMiddleware(['admin']), tableController.deleteTable);

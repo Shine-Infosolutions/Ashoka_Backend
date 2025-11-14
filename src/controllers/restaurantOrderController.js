@@ -106,62 +106,16 @@ exports.createOrder = async (req, res) => {
       });
     }
 
-    // Update table status to occupied and handle merged tables
+    // Update table status to occupied
     try {
       console.log('Attempting to update table status for table:', order.tableNo);
-      const table = await Table.findOne({ tableNumber: order.tableNo });
-      
+      const table = await Table.findOneAndUpdate(
+        { tableNumber: order.tableNo },
+        { status: 'occupied' },
+        { new: true }
+      );
       if (table) {
-        // If table is part of a merge group, check if there's already a master order
-        if (table.mergeGroup) {
-          const masterTable = await Table.findOne({ 
-            mergeGroup: table.mergeGroup, 
-            masterOrderId: { $exists: true, $ne: null } 
-          });
-          
-          if (masterTable && masterTable.masterOrderId) {
-            // Add items to existing master order
-            const masterOrder = await RestaurantOrder.findById(masterTable.masterOrderId);
-            if (masterOrder) {
-              // Merge items from new order into master order
-              masterOrder.items.push(...order.items);
-              masterOrder.amount += order.amount;
-              await masterOrder.save();
-              
-              // Delete the new order since it's merged
-              await RestaurantOrder.findByIdAndDelete(order._id);
-              
-              console.log(`Order merged into master order ${masterTable.masterOrderId}`);
-              
-              // Update response to return master order
-              return res.status(201).json({
-                success: true,
-                order: masterOrder,
-                kot,
-                merged: true
-              });
-            }
-          } else {
-            // This is the first order for the merge group - make it the master
-            await Table.updateMany(
-              { mergeGroup: table.mergeGroup },
-              { 
-                status: 'occupied',
-                masterOrderId: order._id
-              }
-            );
-            console.log(`Order ${order._id} set as master for merge group ${table.mergeGroup}`);
-          }
-        } else {
-          // Single table - just update status
-          await Table.findOneAndUpdate(
-            { tableNumber: order.tableNo },
-            { status: 'occupied' },
-            { new: true }
-          );
-        }
-        
-        console.log('Table status updated successfully:', table.tableNumber, 'to occupied');
+        console.log('Table status updated successfully:', table.tableNumber, 'to', table.status);
         if (io) {
           io.to('waiters').emit('table-status-updated', {
             tableId: table._id,
@@ -446,75 +400,33 @@ exports.updateOrderStatus = async (req, res) => {
 
     // Auto-release table when order is both served and paid
     const shouldReleaseTable = async () => {
-      const table = await Table.findOne({ tableNumber: order.tableNo });
+      // Get all orders for this table
+      const tableOrders = await RestaurantOrder.find({ tableNo: order.tableNo });
       
-      if (table && table.mergeGroup) {
-        // For merged tables, check if the master order is complete
-        const masterTable = await Table.findOne({ 
-          mergeGroup: table.mergeGroup, 
-          masterOrderId: { $exists: true, $ne: null } 
-        });
-        
-        if (masterTable && masterTable.masterOrderId.toString() === order._id.toString()) {
-          // This is the master order - check if it's complete
-          if (['served', 'paid', 'completed'].includes(status)) {
-            try {
-              // Unmerge all tables in the group
-              await Table.updateMany(
-                { mergeGroup: table.mergeGroup },
-                { 
-                  $unset: { mergedWith: 1, mergeGroup: 1, masterOrderId: 1 },
-                  status: 'available'
-                }
-              );
-              
-              // Get all tables for WebSocket notification
-              const allTables = await Table.find({ mergeGroup: table.mergeGroup });
-              
-              if (io) {
-                console.log(`Merge group ${table.mergeGroup} automatically unmerged and released - master order complete`);
-                allTables.forEach(unmergedTable => {
-                  io.to('waiters').emit('table-status-updated', {
-                    tableId: unmergedTable._id,
-                    tableNumber: unmergedTable.tableNumber,
-                    status: 'available'
-                  });
-                });
-              }
-            } catch (tableError) {
-              console.error('Error auto-releasing merged tables:', tableError);
-            }
+      // Check if all orders for this table are both served and paid
+      const allOrdersComplete = tableOrders.every(tableOrder => 
+        (tableOrder.status === 'served' || tableOrder.status === 'paid' || tableOrder.status === 'completed') &&
+        (tableOrder._id.toString() === order._id.toString() ? 
+          (status === 'served' || status === 'paid' || status === 'completed') : true)
+      );
+      
+      if (allOrdersComplete) {
+        try {
+          const table = await Table.findOneAndUpdate(
+            { tableNumber: order.tableNo },
+            { status: 'available' },
+            { new: true }
+          );
+          if (table && io) {
+            console.log(`Table ${table.tableNumber} automatically released - all orders complete`);
+            io.to('waiters').emit('table-status-updated', {
+              tableId: table._id,
+              tableNumber: table.tableNumber,
+              status: 'available'
+            });
           }
-        }
-      } else {
-        // Single table logic
-        const tableOrders = await RestaurantOrder.find({ tableNo: order.tableNo });
-        
-        const allOrdersComplete = tableOrders.every(tableOrder => 
-          (tableOrder.status === 'served' || tableOrder.status === 'paid' || tableOrder.status === 'completed') &&
-          (tableOrder._id.toString() === order._id.toString() ? 
-            (status === 'served' || status === 'paid' || status === 'completed') : true)
-        );
-        
-        if (allOrdersComplete) {
-          try {
-            await Table.findOneAndUpdate(
-              { tableNumber: order.tableNo },
-              { status: 'available' },
-              { new: true }
-            );
-            
-            if (io) {
-              console.log(`Table ${table.tableNumber} automatically released - all orders complete`);
-              io.to('waiters').emit('table-status-updated', {
-                tableId: table._id,
-                tableNumber: table.tableNumber,
-                status: 'available'
-              });
-            }
-          } catch (tableError) {
-            console.error('Error auto-releasing table:', tableError);
-          }
+        } catch (tableError) {
+          console.error('Error auto-releasing table:', tableError);
         }
       }
     };
