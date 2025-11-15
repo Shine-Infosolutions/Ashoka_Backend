@@ -30,7 +30,7 @@ const KOTSchema = new mongoose.Schema({
   }],
   status: {
     type: String,
-    enum: ['pending', 'preparing', 'ready', 'served', 'completed'],
+    enum: ['pending', 'preparing', 'ready', 'served', 'completed', 'cancelled'],
     default: 'pending'
   },
   priority: {

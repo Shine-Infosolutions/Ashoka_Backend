@@ -10,6 +10,15 @@ const itemController = {
     }
   },
 
+  getAvailableItems: async (req, res) => {
+    try {
+      const items = await Item.find({ status: 'available' });
+      res.json(items);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+
   createItem: async (req, res) => {
     try {
       const item = new Item(req.body);
