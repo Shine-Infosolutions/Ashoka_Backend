@@ -37,7 +37,6 @@ const restaurantInvoiceSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Indexes
-restaurantInvoiceSchema.index({ orderId: 1 });
 restaurantInvoiceSchema.index({ 'clientDetails.gstin': 1 });
 
 module.exports = mongoose.model('RestaurantInvoice', restaurantInvoiceSchema);
