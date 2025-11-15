@@ -402,6 +402,15 @@ exports.updateOrderStatus = async (req, res) => {
     );
     if (!order) return res.status(404).json({ error: "Order not found" });
     
+    // If order is cancelled, also cancel all associated KOTs
+    if (status === 'cancelled') {
+      const KOT = require('../models/KOT');
+      await KOT.updateMany(
+        { orderId: order._id },
+        { status: 'cancelled' }
+      );
+    }
+    
     // 🔥 WebSocket: Emit order status update
     const io = req.app.get('io');
     if (io) {
