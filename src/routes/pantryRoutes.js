@@ -1,12 +1,19 @@
 const express = require("express");
 const router = express.Router();
 const pantryController = require("../controllers/pantryController");
+const unitMasterController = require("../controllers/unitMasterController");
 const { authMiddleware } = require("../middleware/authMiddleware");
+
+// Unit Master Routes for Pantry
+router.get(
+  "/units",
+  authMiddleware(["admin", "staff", "pantry"]),
+  unitMasterController.getUnits
+);
 
 // Pantry Items Routes
 router.get(
   "/items",
-  authMiddleware(["admin", "staff", "pantry", "restaurant"]),
   pantryController.getAllPantryItems
 );
 
@@ -18,7 +25,6 @@ router.get(
 
 router.post(
   "/items",
-  authMiddleware(["admin", "staff", "pantry"], ["pantry"]),
   pantryController.createPantryItem
 );
 

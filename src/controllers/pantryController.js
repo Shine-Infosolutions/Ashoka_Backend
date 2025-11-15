@@ -73,7 +73,8 @@ exports.autoCreateVendorOrder = async (outOfStockItems, orderedBy) => {
 exports.getAllPantryItems = async (req, res) => {
   try {
     let items = await PantryItem.find()
-      .populate("category", "name description") // populate category fields
+      .populate("category", "name description")
+      .populate("unit", "name shortName")
       .sort({ name: 1 });
 
     // Calculate isLowStock
@@ -94,6 +95,7 @@ exports.getLowStockPantryItems = async (req, res) => {
   try {
     const items = await PantryItem.find({ stockQuantity: { $lte: 20 } })
       .populate("category", "name description")
+      .populate("unit", "name shortName")
       .sort({ name: 1 });
 
     res.json({ success: true, items });
@@ -107,7 +109,10 @@ exports.createPantryItem = async (req, res) => {
   try {
     const item = new PantryItem(req.body);
     await item.save();
-    const populatedItem = await item.populate("category", "name description");
+    const populatedItem = await item.populate([
+      { path: "category", select: "name description" },
+      { path: "unit", select: "name shortName" }
+    ]);
     res.status(201).json({ success: true, item: populatedItem });
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -122,7 +127,10 @@ exports.updatePantryItem = async (req, res) => {
     });
     if (!item) return res.status(404).json({ error: "Pantry item not found" });
 
-    item = await item.populate("category", "name description");
+    item = await item.populate([
+      { path: "category", select: "name description" },
+      { path: "unit", select: "name shortName" }
+    ]);
     res.json({ success: true, item });
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -268,7 +276,14 @@ exports.createPantryOrder = async (req, res) => {
         const KitchenOrder = require('../models/KitchenOrder');
         
         // Populate items to get item details
-        await order.populate('items.itemId', 'name unit');
+        await order.populate({
+          path: 'items.itemId',
+          select: 'name unit',
+          populate: {
+            path: 'unit',
+            select: 'name shortName'
+          }
+        });
         
         // Create corresponding kitchen order
         const kitchenOrder = new KitchenOrder({
@@ -369,10 +384,16 @@ exports.getPantryOrders = async (req, res) => {
       .populate({
         path: "items.itemId",
         select: "name unit price costPerUnit description category",
-        populate: {
-          path: "category",
-          select: "name"
-        }
+        populate: [
+          {
+            path: "category",
+            select: "name"
+          },
+          {
+            path: "unit",
+            select: "name shortName"
+          }
+        ]
       })
       .sort({ createdAt: -1 });
 
@@ -470,7 +491,14 @@ exports.updatePantryOrderStatus = async (req, res) => {
         const KitchenStore = require('../models/KitchenStore');
         
         // Populate items to get item details
-        await order.populate('items.itemId', 'name unit');
+        await order.populate({
+          path: 'items.itemId',
+          select: 'name unit',
+          populate: {
+            path: 'unit',
+            select: 'name shortName'
+          }
+        });
         console.log('Populated order items:', JSON.stringify(order.items, null, 2));
         
         const processedItems = [];
@@ -563,7 +591,14 @@ exports.updatePantryOrderStatus = async (req, res) => {
             console.log('Created kitchen order with delivered status:', savedKitchenOrder._id);
             
             // Populate the kitchen order for WebSocket emission
-            await savedKitchenOrder.populate('items.itemId', 'name unit');
+            await savedKitchenOrder.populate({
+              path: 'items.itemId',
+              select: 'name unit',
+              populate: {
+                path: 'unit',
+                select: 'name shortName'
+              }
+            });
             
             // Emit WebSocket event for kitchen order creation
             const io = req.app.get('io');
@@ -703,10 +738,16 @@ exports.getPantryOrderById = async (req, res) => {
       .populate({
         path: "items.itemId",
         select: "name unit price costPerUnit description category",
-        populate: {
-          path: "category",
-          select: "name"
-        }
+        populate: [
+          {
+            path: "category",
+            select: "name"
+          },
+          {
+            path: "unit",
+            select: "name shortName"
+          }
+        ]
       });
 
     if (!order) {
