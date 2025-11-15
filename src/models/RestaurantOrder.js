@@ -35,7 +35,7 @@ const RestaurantOrderSchema = new mongoose.Schema({
   notes: String,
   status: {
     type: String,
-    enum: ['reserved','running', 'served' ],
+    enum: ['reserved','running', 'served', 'paid', 'completed' ],
   },
   amount: {
     type: Number,
@@ -69,6 +69,23 @@ const RestaurantOrderSchema = new mongoose.Schema({
     transferredAt: {
       type: Date,
       default: Date.now
+    }
+  }],
+  transactionHistory: [{
+    amount: { type: Number, required: true },
+    method: { type: String, required: true },
+    transactionId: String,
+    processedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    processedAt: {
+      type: Date,
+      default: Date.now
+    },
+    billId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Bill'
     }
   }]
 }, { timestamps: true });

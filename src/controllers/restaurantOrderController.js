@@ -7,6 +7,10 @@ const Table = require("../models/Table");
 // Generate KOT number
 const generateKOTNumber = async () => {
   const today = new Date();
+  const dateStr = today.getFullYear().toString() + 
+                  String(today.getMonth() + 1).padStart(2, '0') + 
+                  String(today.getDate()).padStart(2, '0');
+  
   const count = await KOT.countDocuments({
     createdAt: {
       $gte: new Date(today.getFullYear(), today.getMonth(), today.getDate()),
@@ -14,8 +18,10 @@ const generateKOTNumber = async () => {
     }
   });
   
-  const nextNumber = (count % 9999) + 1;
-  return String(nextNumber).padStart(4, '0');
+  const nextNumber = (count % 999) + 1;
+  const sequentialNumber = String(nextNumber).padStart(3, '0');
+  
+  return `KOT${dateStr}${sequentialNumber}`;
 };
 
 exports.createOrder = async (req, res) => {
@@ -99,6 +105,14 @@ exports.createOrder = async (req, res) => {
         itemCount: kotItems.length
       });
       io.to('waiters').emit('new-order', {
+        order,
+        kot,
+        tableNo: order.tableNo,
+        itemCount: kotItems.length
+      });
+      
+      // Emit to kitchen for chef dashboard
+      io.to('kitchen-updates').emit('new-restaurant-order', {
         order,
         kot,
         tableNo: order.tableNo,
@@ -396,6 +410,13 @@ exports.updateOrderStatus = async (req, res) => {
         status: order.status,
         tableNo: order.tableNo
       });
+      
+      // Emit to kitchen for chef dashboard
+      io.to('kitchen-updates').emit('order-status-update', {
+        orderId: order._id,
+        status: order.status,
+        tableNo: order.tableNo
+      });
     }
 
     // Auto-release table when order is both served and paid
@@ -437,6 +458,31 @@ exports.updateOrderStatus = async (req, res) => {
     }
     
     res.json(order);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
+// Add transaction to order history
+exports.addTransaction = async (req, res) => {
+  try {
+    const { amount, method, billId } = req.body;
+    const order = await RestaurantOrder.findById(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    
+    const transaction = {
+      amount,
+      method,
+      billId,
+      processedBy: req.user?.id,
+      processedAt: new Date()
+    };
+    
+    order.transactionHistory = order.transactionHistory || [];
+    order.transactionHistory.push(transaction);
+    await order.save();
+    
+    res.json({ success: true, transaction });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }

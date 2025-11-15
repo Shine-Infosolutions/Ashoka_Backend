@@ -131,6 +131,14 @@ exports.updateKOTStatus = async (req, res) => {
         status: kot.status,
         tableNo: kot.tableNo
       });
+      
+      // Emit to kitchen for chef dashboard
+      io.to('kitchen-updates').emit('kitchen-order-update', {
+        kotId: kot._id,
+        orderId: kot.orderId,
+        status: kot.status,
+        tableNo: kot.tableNo
+      });
     }
     
     // Send notification when order is marked as served
@@ -207,6 +215,13 @@ exports.updateItemStatuses = async (req, res) => {
     const io = req.app.get('io');
     if (io) {
       io.to('waiters').emit('kot-item-status-updated', {
+        kotId: kot._id,
+        itemStatuses: kot.itemStatuses,
+        tableNo: kot.tableNo
+      });
+      
+      // Emit to kitchen for chef dashboard
+      io.to('kitchen-updates').emit('kitchen-order-update', {
         kotId: kot._id,
         itemStatuses: kot.itemStatuses,
         tableNo: kot.tableNo
