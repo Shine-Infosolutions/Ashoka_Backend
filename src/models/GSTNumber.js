@@ -29,8 +29,7 @@ const gstNumberSchema = new mongoose.Schema({
 
 }, { timestamps: true });
 
-// Indexes
-gstNumberSchema.index({ gstNumber: 1 });
+// Indexes (removed unique constraint on gstNumber to allow updates)
 gstNumberSchema.index({ mobileNumber: 1 });
 gstNumberSchema.index({ company: 1 });
 gstNumberSchema.index({ city: 1 });
