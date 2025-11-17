@@ -65,14 +65,26 @@ exports.createKOT = async (req, res) => {
     
     await kot.save();
     
-    // 🔥 WebSocket: Emit new KOT event
+    // 🔥 WebSocket: Emit new KOT event to both waiters and kitchen
     const io = req.app.get('io');
     if (io) {
-      io.to('waiters').emit('new-kot', {
-        kot,
+      const kotData = {
+        kot: {
+          ...kot.toObject(),
+          displayNumber: getKOTDisplayNumber(kot.kotNumber)
+        },
         tableNo: order.tableNo,
-        itemCount: kotItems.length
-      });
+        itemCount: kotItems.length,
+        timestamp: new Date().toISOString()
+      };
+      
+      // Emit to waiters for order tracking
+      io.to('waiters').emit('new-kot', kotData);
+      
+      // Emit to kitchen for live KOT updates
+      io.to('kitchen-updates').emit('new-kot-created', kotData);
+      
+      console.log('🔥 New KOT broadcasted:', kot.kotNumber);
     }
     
     res.status(201).json({
@@ -125,20 +137,25 @@ exports.updateKOTStatus = async (req, res) => {
     // 🔥 WebSocket: Emit KOT status update
     const io = req.app.get('io');
     if (io) {
-      io.to('waiters').emit('kot-status-updated', {
+      const updateData = {
         kotId: kot._id,
         orderId: kot.orderId,
         status: kot.status,
-        tableNo: kot.tableNo
-      });
+        tableNo: kot.tableNo,
+        kot: {
+          ...kot.toObject(),
+          displayNumber: getKOTDisplayNumber(kot.kotNumber)
+        },
+        timestamp: new Date().toISOString()
+      };
+      
+      // Emit to waiters for order tracking
+      io.to('waiters').emit('kot-status-updated', updateData);
       
       // Emit to kitchen for chef dashboard
-      io.to('kitchen-updates').emit('kitchen-order-update', {
-        kotId: kot._id,
-        orderId: kot.orderId,
-        status: kot.status,
-        tableNo: kot.tableNo
-      });
+      io.to('kitchen-updates').emit('kot-status-updated', updateData);
+      
+      console.log('🔥 KOT status update broadcasted:', kot.kotNumber, '->', kot.status);
     }
     
     // Send notification when order is marked as served
@@ -214,18 +231,24 @@ exports.updateItemStatuses = async (req, res) => {
     // WebSocket: Emit item status update
     const io = req.app.get('io');
     if (io) {
-      io.to('waiters').emit('kot-item-status-updated', {
+      const updateData = {
         kotId: kot._id,
         itemStatuses: kot.itemStatuses,
-        tableNo: kot.tableNo
-      });
+        tableNo: kot.tableNo,
+        kot: {
+          ...kot.toObject(),
+          displayNumber: getKOTDisplayNumber(kot.kotNumber)
+        },
+        timestamp: new Date().toISOString()
+      };
+      
+      // Emit to waiters for order tracking
+      io.to('waiters').emit('kot-item-status-updated', updateData);
       
       // Emit to kitchen for chef dashboard
-      io.to('kitchen-updates').emit('kitchen-order-update', {
-        kotId: kot._id,
-        itemStatuses: kot.itemStatuses,
-        tableNo: kot.tableNo
-      });
+      io.to('kitchen-updates').emit('kot-item-status-updated', updateData);
+      
+      console.log('🔥 KOT item status update broadcasted:', kot.kotNumber);
     }
     
     res.json({ itemStatuses: kot.itemStatuses });

@@ -99,25 +99,21 @@ exports.createOrder = async (req, res) => {
     // 🔥 WebSocket: Emit new order event
     const io = req.app.get('io');
     if (io) {
-      console.log('Emitting new-order event:', {
-        orderId: order._id,
+      const orderData = {
+        order: order.toObject(),
+        kot: kot.toObject(),
         tableNo: order.tableNo,
-        itemCount: kotItems.length
-      });
-      io.to('waiters').emit('new-order', {
-        order,
-        kot,
-        tableNo: order.tableNo,
-        itemCount: kotItems.length
-      });
+        itemCount: kotItems.length,
+        timestamp: new Date().toISOString()
+      };
       
-      // Emit to kitchen for chef dashboard
-      io.to('kitchen-updates').emit('new-restaurant-order', {
-        order,
-        kot,
-        tableNo: order.tableNo,
-        itemCount: kotItems.length
-      });
+      console.log('🔥 New order broadcasted:', order._id, 'Table:', order.tableNo);
+      
+      // Emit to waiters for order tracking
+      io.to('waiters').emit('new-order', orderData);
+      
+      // Emit to kitchen for live KOT updates
+      io.to('kitchen-updates').emit('new-restaurant-order', orderData);
     }
 
     // Update table status to occupied
@@ -414,18 +410,21 @@ exports.updateOrderStatus = async (req, res) => {
     // 🔥 WebSocket: Emit order status update
     const io = req.app.get('io');
     if (io) {
-      io.to('waiters').emit('order-status-updated', {
+      const updateData = {
         orderId: order._id,
         status: order.status,
-        tableNo: order.tableNo
-      });
+        tableNo: order.tableNo,
+        order: order.toObject(),
+        timestamp: new Date().toISOString()
+      };
+      
+      console.log('🔥 Order status update broadcasted:', order._id, '->', order.status);
+      
+      // Emit to waiters for order tracking
+      io.to('waiters').emit('order-status-updated', updateData);
       
       // Emit to kitchen for chef dashboard
-      io.to('kitchen-updates').emit('order-status-update', {
-        orderId: order._id,
-        status: order.status,
-        tableNo: order.tableNo
-      });
+      io.to('kitchen-updates').emit('order-status-updated', updateData);
     }
 
     // Auto-release table when order is both served and paid
