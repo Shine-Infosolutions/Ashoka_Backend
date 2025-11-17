@@ -30,9 +30,9 @@ exports.createOrder = async (req, res) => {
 
     // ✅ Validate order type
     if (!bookingId) {
-      if (!req.body.staffName || !req.body.phoneNumber || !req.body.tableNo) {
+      if (!req.body.staffName || !req.body.tableNo) {
         return res.status(400).json({
-          error: "For non-booking orders, staffName, phoneNumber, and tableNo are required",
+          error: "For non-booking orders, staffName and tableNo are required",
         });
       }
     }
@@ -542,7 +542,7 @@ exports.generateInvoice = async (req, res) => {
       orderId: order._id,
       tableNo: order.tableNo,
       staffName: order.staffName,
-      phoneNumber: order.phoneNumber,
+      customerName: order.customerName,
       items: invoiceItems,
       subtotal: subtotal,
       orderDiscount: orderDiscount,

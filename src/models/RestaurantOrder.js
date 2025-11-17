@@ -14,9 +14,9 @@ const RestaurantOrderSchema = new mongoose.Schema({
   roomNumber: String,
   guestName: String,
   guestPhone: String,
-  phoneNumber: {
+  customerName: {
     type: String,
-    required: true
+    required: false
   },
   tableNo: {
     type: String,
