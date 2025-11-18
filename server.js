@@ -73,6 +73,7 @@ const io = new Server(server, {
         "https://ashokacrm.vercel.app",
         "https://zomato-frontend-mocha.vercel.app",
         "https://ashoka-api.shineinfosolutions.in",
+        "https://ashoka-frontend.shineinfosolutions.in",
       ];
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
