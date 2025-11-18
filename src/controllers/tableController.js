@@ -143,6 +143,14 @@ exports.deleteTable = async (req, res) => {
       return res.status(404).json({ error: 'Table not found' });
     }
     
+    // 🔥 WebSocket: Emit table deleted
+    const io = req.app.get('io');
+    if (io) {
+      io.to('waiters').emit('table-deleted', {
+        tableId: table._id
+      });
+    }
+    
     res.json({ success: true, message: 'Table deleted successfully' });
   } catch (error) {
     res.status(400).json({ error: error.message });
