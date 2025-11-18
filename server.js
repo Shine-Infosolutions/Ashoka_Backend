@@ -61,6 +61,7 @@ const gstNumberRoutes = require("./src/routes/gstNumberRoutes.js");
 const restaurantInvoiceRoutes = require("./src/routes/restaurantInvoiceRoutes.js");
 
 const path = require("path");
+
 // Initialize express app
 const app = express();
 const server = createServer(app);
@@ -69,6 +70,7 @@ const io = new Server(server, {
     origin: function (origin, callback) {
       const allowedOrigins = [
         "http://localhost:5173",
+        "http://localhost:5174",
         "http://localhost:3000",
         "https://ashokacrm.vercel.app",
         "https://zomato-frontend-mocha.vercel.app",
@@ -84,7 +86,45 @@ const io = new Server(server, {
     methods: ["GET", "POST"],
     credentials: true
   },
-  transports: ['polling', 'websocket']
+  transports: ['websocket', 'polling'],
+  allowEIO3: true,
+  pingTimeout: 60000,
+  pingInterval: 25000
+});
+
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  console.log('🔗 User connected:', socket.id);
+  
+  // Join rooms
+  socket.on("join-waiter-dashboard", () => {
+    socket.join("waiters");
+    console.log(`👨‍🍳 Socket ${socket.id} joined waiters room`);
+  });
+  
+  socket.on("join-pantry-updates", () => {
+    socket.join("pantry-updates");
+    console.log(`🥫 Socket ${socket.id} joined pantry-updates room`);
+  });
+  
+  socket.on("join-kitchen-updates", () => {
+    socket.join("kitchen-updates");
+    console.log(`🍳 Socket ${socket.id} joined kitchen-updates room`);
+  });
+  
+  // Test message handler
+  socket.on("test-message", (data) => {
+    console.log(`📨 Test message received from ${socket.id}:`, data);
+    socket.emit("test-response", { message: "Hello from server!", timestamp: new Date() });
+  });
+  
+  socket.on('disconnect', (reason) => {
+    console.log('❌ User disconnected:', socket.id, 'Reason:', reason);
+  });
+  
+  socket.on('error', (error) => {
+    console.error('Socket error:', error);
+  });
 });
 
 // Make io available globally
@@ -93,13 +133,14 @@ app.set("io", io);
 // Middleware
 const allowedOrigins = [
   "http://localhost:5173",
+  "http://localhost:5174",
   "http://localhost:3000",
   "https://ashoka-api.shineinfosolutions.in",
   "https://ashoka-backend.vercel.app",
   "https://ashokacrm.vercel.app",
-  "https://ashoka-api.shineinfosolutions.in",
   "https://ashoka-frontend.shineinfosolutions.in",
 ];
+
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -168,10 +209,8 @@ app.use("/api/search", searchRoutes);
 app.use("/api/paginate", paginationRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/invoices", invoiceRoutes);
-
 app.use("/api/checkout", checkoutRoutes);
 app.use("/api/restaurant-reservations", restaurantReservationRoutes);
-
 app.use("/api/payments", paymentRoutes);
 app.use("/api/banquet-menus", banquetMenuRoutes);
 app.use("/api/banquet-bookings", banquetBookingRoutes);
@@ -183,7 +222,6 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/wastage", wastageRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/payroll", payrollRoutes);
-
 app.use("/api/vendor", vendorRoutes);
 app.use("/api/room-inspections", roomInspectionRoutes);
 app.use("/api/pantry-categories", pantryCategoryRoutes);
@@ -214,52 +252,15 @@ app.get("/", (req, res) => {
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error("Server error:", err);
-  res.status(500).json({ error: "Server error", message: err.message });
+  res.status(500).json({ error: "Internal server error", message: err.message });
 });
 
-// Socket.io connection handling
-io.on("connection", (socket) => {
-  console.log(`🔗 Client connected: ${socket.id}`);
-  
-  // Join rooms
-  socket.on("join-waiter-dashboard", () => {
-    socket.join("waiters");
-    console.log(`👨‍🍳 Socket ${socket.id} joined waiters room`);
-  });
-  
-  socket.on("join-pantry-updates", () => {
-    socket.join("pantry-updates");
-    console.log(`🥫 Socket ${socket.id} joined pantry-updates room`);
-  });
-  
-  socket.on("join-kitchen-updates", () => {
-    socket.join("kitchen-updates");
-    console.log(`🍳 Socket ${socket.id} joined kitchen-updates room`);
-  });
-  
-  // Test message handler
-  socket.on("test-message", (data) => {
-    console.log(`📨 Test message received from ${socket.id}:`, data);
-    socket.emit("test-response", { message: "Hello from server!", timestamp: new Date() });
-  });
- 
-  socket.on("disconnect", (reason) => {
-    console.log(`❌ Client disconnected: ${socket.id}, reason: ${reason}`);
-  });
+// Start server
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT}`);
+  console.log(`Socket.IO server ready`);
 });
-
-// Banquet updates via Socket.io
-io.on('banquet-update', (data) => {
-  io.emit('banquet-notification', data);
-});
-
-if (process.env.NODE_ENV !== "production") {
-  const PORT = process.env.PORT || 5000;
-  server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-}else{
-    const PORT = 3000;
-    server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-}
 
 // Export for serverless
 module.exports = app;
