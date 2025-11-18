@@ -139,7 +139,6 @@ const updateKitchenOrder = async (req, res) => {
         
         for (const orderItem of order.items) {
           const itemName = orderItem.itemId?.name || orderItem.name;
-          const itemUnit = orderItem.itemId?.unit || orderItem.unit || 'pcs';
           const itemQuantity = Number(orderItem.quantity);
           
           if (!itemName || itemQuantity <= 0) {
@@ -147,36 +146,52 @@ const updateKitchenOrder = async (req, res) => {
             continue;
           }
           
-          // Reduce pantry stock (pantry sends items to kitchen)
-          const pantryItem = await PantryItem.findOne({ name: itemName }).populate('unit');
-          if (pantryItem && pantryItem.stockQuantity >= itemQuantity) {
-            const oldPantryStock = pantryItem.stockQuantity;
-            pantryItem.stockQuantity -= itemQuantity;
-            await pantryItem.save();
-            console.log(`Reduced pantry stock: ${itemName} ${oldPantryStock} - ${itemQuantity} = ${pantryItem.stockQuantity}`);
-          } else {
-            console.log(`Warning: Insufficient pantry stock for ${itemName}. Available: ${pantryItem?.stockQuantity || 0}, Required: ${itemQuantity}`);
-          }
-          
-          // Add to kitchen store
-          let kitchenItem = await KitchenStore.findOne({ 
-            name: itemName 
-          });
-          
-          if (kitchenItem) {
-            const oldQuantity = Number(kitchenItem.quantity);
-            kitchenItem.quantity = oldQuantity + itemQuantity;
-            await kitchenItem.save();
-            console.log(`Updated kitchen store: ${itemName} ${oldQuantity} + ${itemQuantity} = ${kitchenItem.quantity} ${itemUnit}`);
-          } else {
-            kitchenItem = new KitchenStore({
-              name: itemName,
-              category: 'Food',
-              quantity: itemQuantity,
-              unit: itemUnit
+          try {
+            // Reduce pantry stock (pantry sends items to kitchen)
+            const pantryItem = await PantryItem.findOne({ name: itemName }).populate('unit').populate('category');
+            if (pantryItem) {
+              if (pantryItem.stockQuantity >= itemQuantity) {
+                const oldPantryStock = pantryItem.stockQuantity;
+                // Use updateOne to avoid validation issues
+                await PantryItem.updateOne(
+                  { _id: pantryItem._id },
+                  { $inc: { stockQuantity: -itemQuantity } }
+                );
+                console.log(`Reduced pantry stock: ${itemName} ${oldPantryStock} - ${itemQuantity} = ${oldPantryStock - itemQuantity}`);
+              } else {
+                console.log(`Warning: Insufficient pantry stock for ${itemName}. Available: ${pantryItem.stockQuantity}, Required: ${itemQuantity}`);
+              }
+            } else {
+              console.log(`Warning: Pantry item not found: ${itemName}`);
+            }
+            
+            // Add to kitchen store
+            let kitchenItem = await KitchenStore.findOne({ 
+              name: itemName 
             });
-            await kitchenItem.save();
-            console.log(`Created new kitchen store item: ${itemName} with ${itemQuantity} ${itemUnit}`);
+            
+            if (kitchenItem) {
+              const oldQuantity = Number(kitchenItem.quantity);
+              await KitchenStore.updateOne(
+                { _id: kitchenItem._id },
+                { $inc: { quantity: itemQuantity } }
+              );
+              console.log(`Updated kitchen store: ${itemName} ${oldQuantity} + ${itemQuantity} = ${oldQuantity + itemQuantity}`);
+            } else {
+              // Get unit from pantry item or use default
+              const unitName = pantryItem?.unit?.name || 'pcs';
+              kitchenItem = new KitchenStore({
+                name: itemName,
+                category: 'Food',
+                quantity: itemQuantity,
+                unit: unitName
+              });
+              await kitchenItem.save();
+              console.log(`Created new kitchen store item: ${itemName} with ${itemQuantity} ${unitName}`);
+            }
+          } catch (itemError) {
+            console.error(`Error processing item ${itemName}:`, itemError.message);
+            continue;
           }
         }
         console.log('Kitchen store and pantry stock update completed successfully');
