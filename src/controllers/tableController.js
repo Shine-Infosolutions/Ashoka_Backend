@@ -27,6 +27,7 @@ exports.getAllTables = async (req, res) => {
 // Create table
 exports.createTable = async (req, res) => {
   try {
+    console.log('Received table data:', req.body);
     const { capacity } = req.body;
     
     if (capacity && capacity > 4) {
@@ -34,6 +35,7 @@ exports.createTable = async (req, res) => {
     }
     
     const table = new Table(req.body);
+    console.log('Created table instance:', table);
     await table.save();
     
     // 🔥 WebSocket: Emit new table created

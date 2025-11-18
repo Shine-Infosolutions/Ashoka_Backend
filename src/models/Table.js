@@ -14,7 +14,7 @@ const TableSchema = new mongoose.Schema({
   },
   location: {
     type: String,
-    enum: ['restaurant', 'bar', 'terrace', 'private_dining'],
+    enum: ['dining', 'rooftop'],
     required: true
   },
   status: {
@@ -28,4 +28,9 @@ const TableSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-module.exports = mongoose.models.Table || mongoose.model('Table', TableSchema);
+// Clear any existing model to avoid caching issues
+if (mongoose.models.Table) {
+  delete mongoose.models.Table;
+}
+
+module.exports = mongoose.model('Table', TableSchema);
