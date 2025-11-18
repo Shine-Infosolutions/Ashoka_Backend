@@ -148,7 +148,7 @@ const updateKitchenOrder = async (req, res) => {
           }
           
           // Reduce pantry stock (pantry sends items to kitchen)
-          const pantryItem = await PantryItem.findOne({ name: itemName });
+          const pantryItem = await PantryItem.findOne({ name: itemName }).populate('unit');
           if (pantryItem && pantryItem.stockQuantity >= itemQuantity) {
             const oldPantryStock = pantryItem.stockQuantity;
             pantryItem.stockQuantity -= itemQuantity;
