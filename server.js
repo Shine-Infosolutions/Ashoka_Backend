@@ -97,6 +97,7 @@ const allowedOrigins = [
   "https://ashoka-backend.vercel.app",
   "https://ashokacrm.vercel.app",
   "https://ashoka-api.shineinfosolutions.in",
+  "https://ashoka-frontend.shineinfosolutions.in",
 ];
 app.use(
   cors({
