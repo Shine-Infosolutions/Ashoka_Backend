@@ -14,7 +14,7 @@ const TableSchema = new mongoose.Schema({
   },
   location: {
     type: String,
-    enum: ['restaurant', 'bar', 'terrace', 'private_dining'],
+    enum: ['dining', 'rooftop'],
     required: true
   },
   status: {
