@@ -5,6 +5,17 @@ const Housekeeping = require("../models/Housekeeping.js");
 const mongoose = require('mongoose');
 const  Reservation = require("../models/Reservation.js");
 
+// 🔹 Meal Plan Logic
+const getMealInclusions = (planPackage) => {
+  const mealPlans = {
+    'EP': { breakfast: false, lunch: false, dinner: false }, // European Plan - Room only
+    'CP': { breakfast: true, lunch: false, dinner: false },  // Continental Plan - Room + Breakfast
+    'MAP': { breakfast: true, lunch: false, dinner: true },  // Modified American Plan - Room + Breakfast + Dinner
+    'AP': { breakfast: true, lunch: true, dinner: true }     // American Plan - All meals
+  };
+  return mealPlans[planPackage] || { breakfast: false, lunch: false, dinner: false };
+};
+
 // 🔹 Generate unique GRC number
 const generateGRC = async () => {
   let grcNo, exists = true;
@@ -131,7 +142,12 @@ exports.bookRoom = async (req, res) => {
         const bookings = await handleBooking(categoryId, count, extraDetails);
         results.push(...bookings);
       }
-      return res.status(201).json({ success: true, booked: results });
+      // Add meal inclusions to response
+      const resultsWithMeals = results.map(booking => ({
+        ...booking.toObject(),
+        mealInclusions: getMealInclusions(booking.planPackage)
+      }));
+      return res.status(201).json({ success: true, booked: resultsWithMeals });
     }
 
     // 🔹 Single Booking
@@ -147,7 +163,13 @@ exports.bookRoom = async (req, res) => {
 
     const bookings = await handleBooking(categoryId, numRooms, extraDetails);
 
-    return res.status(201).json({ success: true, booked: bookings });
+    // Add meal inclusions to response
+    const bookingsWithMeals = bookings.map(booking => ({
+      ...booking.toObject(),
+      mealInclusions: getMealInclusions(booking.planPackage)
+    }));
+    
+    return res.status(201).json({ success: true, booked: bookingsWithMeals });
 
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -160,12 +182,13 @@ exports.getBookings = async (req, res) => {
     const filter = req.query.all === 'true' ? {} : { isActive: true };
     const bookings = await Booking.find(filter).populate('categoryId');
 
-    // Map bookings to ensure safe access to category properties
+    // Map bookings to ensure safe access to category properties and add meal inclusions
     const safeBookings = bookings.map(booking => {
       const bookingObj = booking.toObject();
       if (!bookingObj.categoryId) {
         bookingObj.categoryId = { name: 'Unknown' };
       }
+      bookingObj.mealInclusions = getMealInclusions(bookingObj.planPackage);
       return bookingObj;
     });
 
@@ -187,8 +210,14 @@ exports.getBookingsByCategory = async (req, res) => {
 
     // Query bookings for that categoryId
     const bookings = await Booking.find({ categoryId: mongooseCategoryId }).populate('categoryId');
+    
+    // Add meal inclusions to each booking
+    const bookingsWithMeals = bookings.map(booking => ({
+      ...booking.toObject(),
+      mealInclusions: getMealInclusions(booking.planPackage)
+    }));
 
-    res.json(bookings);
+    res.json(bookingsWithMeals);
   } catch (error) {
     console.error("Error:", error);
     res.status(500).json({ error: error.message });
@@ -476,6 +505,7 @@ exports.getBookingByGRC = async (req, res) => {
     if (!result.categoryId) {
       result.categoryId = { name: 'Unknown' };
     }
+    result.mealInclusions = getMealInclusions(result.planPackage);
 
     res.json({ success: true, booking: result });
   } catch (error) {
@@ -520,6 +550,7 @@ exports.getBookingById = async (req, res) => {
     if (!result.categoryId) {
       result.categoryId = { name: 'Unknown' };
     }
+    result.mealInclusions = getMealInclusions(result.planPackage);
 
     res.json({ success: true, booking: result });
   } catch (error) {

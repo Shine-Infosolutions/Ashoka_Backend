@@ -45,7 +45,7 @@ const bookingSchema = new mongoose.Schema({
   photoUrl: { type: String },
 
   roomNumber: { type: String },
-  planPackage: { type: String }, //cp map/ mp
+  planPackage: { type: String, enum: ['CP', 'MAP', 'AP', 'EP'] },
   noOfAdults: { type: Number },
   noOfChildren: { type: Number },
   rate: { type: Number },
