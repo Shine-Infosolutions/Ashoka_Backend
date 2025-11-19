@@ -3,6 +3,7 @@ const Item = require("../models/Items");
 const KOT = require("../models/KOT");
 const Bill = require("../models/Bill");
 const Table = require("../models/Table");
+const NOC = require("../models/NOC");
 
 // Generate KOT number
 const generateKOTNumber = async () => {
@@ -45,6 +46,18 @@ exports.createOrder = async (req, res) => {
       });
     }
 
+    // ✅ Validate NOCs for free items
+    for (const item of items) {
+      if (item.isFree && item.nocId) {
+        const noc = await NOC.findById(item.nocId);
+        if (!noc || noc.status !== 'active') {
+          return res.status(400).json({
+            error: `Invalid or inactive NOC for item ${item.itemId}`
+          });
+        }
+      }
+    }
+
     // ✅ Fetch item details (attach name and price)
     const populatedItems = await Promise.all(
       items.map(async (item) => {
@@ -54,12 +67,16 @@ exports.createOrder = async (req, res) => {
           itemName: itemDetails?.name || "Unknown Item",
           quantity: item.quantity,
           price: itemDetails?.Price || 0,
+          isFree: item.isFree || false,
+          nocId: item.nocId || null
         };
       })
     );
 
-    // ✅ Calculate total amount
-    const totalAmount = populatedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    // ✅ Calculate total amount (excluding free items)
+    const totalAmount = populatedItems.reduce((sum, item) => {
+      return sum + (item.isFree ? 0 : item.price * item.quantity);
+    }, 0);
 
     // ✅ Save Order
     const orderData = {
@@ -72,6 +89,13 @@ exports.createOrder = async (req, res) => {
     const order = new RestaurantOrder(orderData);
     await order.save();
 
+    // ✅ Mark NOCs as used for free items
+    for (const item of populatedItems) {
+      if (item.isFree && item.nocId) {
+        await NOC.findByIdAndUpdate(item.nocId, { status: 'used' });
+      }
+    }
+
     // ✅ Auto-create KOT
     const kotNumber = await generateKOTNumber();
 
@@ -80,7 +104,9 @@ exports.createOrder = async (req, res) => {
       itemName: item.itemName,
       quantity: item.quantity,
       rate: item.price,
-      amount: item.price * item.quantity,
+      amount: item.isFree ? 0 : item.price * item.quantity,
+      isFree: item.isFree || false,
+      nocId: item.nocId || null
     }));
 
     const kot = new KOT({
@@ -518,7 +544,7 @@ exports.generateInvoice = async (req, res) => {
         const discount = item.itemId?.Discount || 0;
         const discountAmount = (itemPrice * discount) / 100;
         const finalPrice = itemPrice - discountAmount;
-        const itemTotal = finalPrice * item.quantity;
+        const itemTotal = item.isFree ? 0 : finalPrice * item.quantity;
         subtotal += itemTotal;
         
         invoiceItems.push({
@@ -528,7 +554,9 @@ exports.generateInvoice = async (req, res) => {
           finalPrice: finalPrice,
           quantity: item.quantity,
           total: itemTotal,
-          kotNumber: kot.kotNumber
+          kotNumber: kot.kotNumber,
+          isFree: item.isFree || false,
+          nocId: item.nocId || null
         });
       });
     });
