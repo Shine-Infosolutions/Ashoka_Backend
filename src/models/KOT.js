@@ -26,7 +26,14 @@ const KOTSchema = new mongoose.Schema({
     },
     itemName: String,
     quantity: { type: Number, required: true },
-    specialInstructions: String
+    rate: { type: Number, default: 0 },
+    amount: { type: Number, default: 0 },
+    specialInstructions: String,
+    isFree: { type: Boolean, default: false },
+    nocId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'NOC'
+    }
   }],
   status: {
     type: String,
