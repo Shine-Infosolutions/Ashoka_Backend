@@ -66,7 +66,7 @@ exports.createOrder = async (req, res) => {
           itemId: item.itemId,
           itemName: itemDetails?.name || "Unknown Item",
           quantity: item.quantity,
-          price: itemDetails?.Price || 0,
+          price: item.isFree ? 0 : (itemDetails?.Price || 0),
           isFree: item.isFree || false,
           nocId: item.nocId || null
         };
@@ -103,7 +103,7 @@ exports.createOrder = async (req, res) => {
       itemId: item.itemId,
       itemName: item.itemName,
       quantity: item.quantity,
-      rate: item.price,
+      rate: item.isFree ? 0 : item.price,
       amount: item.isFree ? 0 : item.price * item.quantity,
       isFree: item.isFree || false,
       nocId: item.nocId || null
