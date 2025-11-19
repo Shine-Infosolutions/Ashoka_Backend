@@ -72,4 +72,10 @@ router.get(
   bookingController.getBookingHistory
 );
 
+// ✅ Convert reservation to booking
+router.post(
+  "/convert-reservation/:reservationId",
+  bookingController.convertReservationToBooking
+);
+
 module.exports = router;
