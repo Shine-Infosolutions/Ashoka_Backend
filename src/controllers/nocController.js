@@ -27,7 +27,7 @@ const createAndApplyNOC = async (req, res) => {
 // Get all NOCs
 const getAllNOCs = async (req, res) => {
   try {
-    const nocs = await NOC.find().populate('authorizedBy', 'name');
+    const nocs = await NOC.find();
     res.json({ success: true, nocs });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -38,7 +38,7 @@ const getAllNOCs = async (req, res) => {
 const getNOCById = async (req, res) => {
   try {
     const { id } = req.params;
-    const noc = await NOC.findById(id).populate('authorizedBy', 'name');
+    const noc = await NOC.findById(id);
     
     if (!noc) {
       return res.status(404).json({ success: false, error: 'NOC not found' });
@@ -92,7 +92,7 @@ const updateNOC = async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
     
-    const noc = await NOC.findByIdAndUpdate(id, updates, { new: true }).populate('authorizedBy', 'name');
+    const noc = await NOC.findByIdAndUpdate(id, updates, { new: true });
     if (!noc) {
       return res.status(404).json({ success: false, error: 'NOC not found' });
     }
