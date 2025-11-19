@@ -16,6 +16,101 @@ const getMealInclusions = (planPackage) => {
   return mealPlans[planPackage] || { breakfast: false, lunch: false, dinner: false };
 };
 
+// 🔹 Convert Reservation to Booking
+exports.convertReservationToBooking = async (req, res) => {
+  try {
+    const { reservationId } = req.params;
+    const { roomNumber, ...additionalDetails } = req.body;
+
+    const reservation = await Reservation.findById(reservationId).populate('category');
+    if (!reservation) return res.status(404).json({ error: 'Reservation not found' });
+
+    if (reservation.status === 'Cancelled') {
+      return res.status(400).json({ error: 'Cannot convert cancelled reservation' });
+    }
+
+    // Check if already converted
+    if (reservation.linkedCheckInId) {
+      return res.status(400).json({ error: 'Reservation already converted to booking' });
+    }
+
+    const grcNo = await generateGRC();
+
+    // Map reservation data to booking format
+    const bookingData = {
+      grcNo,
+      reservationId: reservation._id,
+      categoryId: reservation.category,
+      
+      checkInDate: reservation.checkInDate,
+      checkOutDate: reservation.checkOutDate,
+      timeIn: reservation.checkInTime,
+      timeOut: reservation.checkOutTime,
+      
+      salutation: reservation.salutation,
+      name: reservation.guestName,
+      address: reservation.address,
+      city: reservation.city,
+      nationality: reservation.nationality,
+      mobileNo: reservation.mobileNo,
+      email: reservation.email,
+      phoneNo: reservation.phoneNo,
+      
+      companyName: reservation.companyName,
+      companyGSTIN: reservation.companyGSTIN,
+      
+      roomNumber: roomNumber || null,
+      planPackage: reservation.planPackage,
+      noOfAdults: reservation.noOfAdults,
+      noOfChildren: reservation.noOfChildren,
+      rate: reservation.rate,
+      
+      arrivedFrom: reservation.arrivalFrom,
+      purposeOfVisit: reservation.purposeOfVisit,
+      remark: reservation.remarks,
+      
+      discountPercent: reservation.discountPercent,
+      paymentMode: reservation.paymentMode,
+      paymentStatus: reservation.paymentStatus,
+      bookingRefNo: reservation.bookingRefNo,
+      billingInstruction: reservation.billingInstruction,
+      
+      vip: reservation.vip,
+      status: 'Booked',
+      
+      ...additionalDetails
+    };
+
+    const booking = new Booking(bookingData);
+    await booking.save();
+
+    // Update reservation with linked booking
+    reservation.linkedCheckInId = booking._id;
+    await reservation.save();
+
+    // Update room status if room assigned
+    if (roomNumber) {
+      await Room.findOneAndUpdate(
+        { room_number: roomNumber },
+        { status: 'booked' }
+      );
+    }
+
+    const result = {
+      ...booking.toObject(),
+      mealInclusions: getMealInclusions(booking.planPackage)
+    };
+
+    res.status(201).json({ 
+      success: true, 
+      message: 'Reservation converted to booking successfully',
+      booking: result 
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 // 🔹 Generate unique GRC number
 const generateGRC = async () => {
   let grcNo, exists = true;
@@ -572,7 +667,8 @@ exports.getBookingHistory = async (req, res) => {
         const invoices = await Invoice.find({ bookingId: booking._id });
         return {
           ...booking.toObject(),
-          invoices
+          invoices,
+          mealInclusions: getMealInclusions(booking.planPackage)
         };
       })
     );
