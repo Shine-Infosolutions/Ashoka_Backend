@@ -30,7 +30,12 @@ const RestaurantOrderSchema = new mongoose.Schema({
     },
     itemName: { type: String }, 
     quantity: { type: Number, required: true },
-    price: { type: Number, required: true }
+    price: { type: Number, required: true },
+    isFree: { type: Boolean, default: false },
+    nocId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'NOC'
+    }
   }],
   notes: String,
   status: {
