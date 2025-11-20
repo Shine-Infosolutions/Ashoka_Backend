@@ -282,10 +282,26 @@ exports.addItemsToOrder = async (req, res) => {
     const order = await RestaurantOrder.findById(req.params.id);
     if (!order) return res.status(404).json({ error: 'Order not found' });
     
+    // Validate and fetch item details
+    const validatedItems = [];
     for (const newItem of items) {
       const itemDetails = await Item.findById(newItem.itemId);
-      if (!itemDetails) continue;
+      if (!itemDetails) {
+        return res.status(400).json({ error: `Item not found: ${newItem.itemId}` });
+      }
       
+      validatedItems.push({
+        itemId: newItem.itemId,
+        itemName: itemDetails.name,
+        quantity: newItem.quantity || 1,
+        price: newItem.isFree ? 0 : itemDetails.Price,
+        isFree: newItem.isFree || false,
+        nocId: newItem.nocId || null
+      });
+    }
+    
+    // Add items to order
+    for (const newItem of validatedItems) {
       const existingItemIndex = order.items.findIndex(
         item => item.itemId.toString() === newItem.itemId
       );
@@ -293,24 +309,21 @@ exports.addItemsToOrder = async (req, res) => {
       if (existingItemIndex >= 0) {
         order.items[existingItemIndex].quantity += newItem.quantity;
       } else {
-        order.items.push({
-          itemId: newItem.itemId,
-          itemName: itemDetails.name,
-          quantity: newItem.quantity,
-          price: itemDetails.Price
-        });
+        order.items.push(newItem);
       }
     }
     
-    // Recalculate total amount from all items
-    order.amount = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    // Recalculate total amount from all items (excluding free items)
+    order.amount = order.items.reduce((sum, item) => {
+      return sum + (item.isFree ? 0 : item.price * item.quantity);
+    }, 0);
     await order.save();
     
     // Update existing bill if it exists
     const existingBill = await Bill.findOne({ orderId: order._id });
     if (existingBill) {
-      existingBill.subtotal = totalAmount;
-      existingBill.totalAmount = totalAmount - existingBill.discount + existingBill.tax;
+      existingBill.subtotal = order.amount;
+      existingBill.totalAmount = order.amount - existingBill.discount + existingBill.tax;
       await existingBill.save();
     }
     
@@ -319,45 +332,49 @@ exports.addItemsToOrder = async (req, res) => {
     
     if (existingKot) {
       // Add new items to existing KOT
-      for (const newItem of items) {
-        const itemDetails = await Item.findById(newItem.itemId);
-        if (!itemDetails) continue;
-        
+      for (const newItem of validatedItems) {
         existingKot.items.push({
           itemId: newItem.itemId,
-          itemName: itemDetails.name,
+          itemName: newItem.itemName,
           quantity: newItem.quantity,
-          rate: itemDetails.Price,
-          amount: itemDetails.Price * newItem.quantity
+          rate: newItem.price,
+          amount: newItem.price * newItem.quantity,
+          isFree: newItem.isFree || false,
+          nocId: newItem.nocId || null
         });
       }
       
       await existingKot.save();
       
-      // WebSocket: Emit KOT update
+      // WebSocket: Emit KOT update with sound
       const io = req.app.get('io');
       if (io) {
-        io.to('waiters').emit('kot-items-added', {
-          kotId: existingKot._id,
-          orderId: order._id,
-          newItems: items,
-          tableNo: order.tableNo
-        });
+        const kotData = {
+          kot: existingKot.toObject(),
+          tableNo: order.tableNo,
+          itemCount: validatedItems.length,
+          timestamp: new Date().toISOString()
+        };
+        
+        // Emit to waiters for order tracking
+        io.to('waiters').emit('new-kot', kotData);
+        
+        // Emit to kitchen for live KOT updates
+        io.to('kitchen-updates').emit('new-kot', kotData);
       }
       
       res.json({ order, kot: existingKot });
     } else {
       // Create new KOT if none exists (fallback)
       const kotNumber = await generateKOTNumber();
-      const kotItems = await Promise.all(items.map(async (item) => {
-        const itemDetails = await Item.findById(item.itemId);
-        return {
-          itemId: item.itemId,
-          itemName: itemDetails?.name || 'Unknown Item',
-          quantity: item.quantity,
-          rate: itemDetails?.Price || 0,
-          amount: (itemDetails?.Price || 0) * item.quantity
-        };
+      const kotItems = validatedItems.map(item => ({
+        itemId: item.itemId,
+        itemName: item.itemName,
+        quantity: item.quantity,
+        rate: item.price,
+        amount: item.price * item.quantity,
+        isFree: item.isFree || false,
+        nocId: item.nocId || null
       }));
       
       const newKot = new KOT({
@@ -379,7 +396,7 @@ exports.addItemsToOrder = async (req, res) => {
 // Transfer order to different table
 exports.transferTable = async (req, res) => {
   try {
-    const { newTableNo, reason } = req.body;
+    const { newTableNo, reason, oldTableStatus = 'available' } = req.body;
     const order = await RestaurantOrder.findById(req.params.id);
     if (!order) return res.status(404).json({ error: "Order not found" });
 
@@ -403,6 +420,25 @@ exports.transferTable = async (req, res) => {
 
     // Update bill if exists
     await Bill.updateMany({ orderId: order._id }, { tableNo: newTableNo });
+
+    // Update table statuses
+    try {
+      // Set old table status as selected
+      await Table.findOneAndUpdate(
+        { tableNumber: oldTableNo },
+        { status: oldTableStatus }
+      );
+      
+      // Set new table as occupied
+      await Table.findOneAndUpdate(
+        { tableNumber: newTableNo },
+        { status: 'occupied' }
+      );
+      
+      console.log(`Table transfer: ${oldTableNo} -> ${oldTableStatus}, ${newTableNo} -> occupied`);
+    } catch (tableError) {
+      console.error('Error updating table statuses during transfer:', tableError);
+    }
 
     res.json({
       message: `Order transferred from Table ${oldTableNo} to Table ${newTableNo}`,
