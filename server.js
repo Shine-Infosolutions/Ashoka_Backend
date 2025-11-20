@@ -1,3 +1,4 @@
+
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
@@ -59,7 +60,8 @@ const gstRoutes = require("./src/routes/gstRoutes.js");
 const { restrictPantryAccess } = require("./src/middleware/authMiddleware.js");
 const gstNumberRoutes = require("./src/routes/gstNumberRoutes.js");
 const restaurantInvoiceRoutes = require("./src/routes/restaurantInvoiceRoutes.js");
-const itemCategoryRoutes = require("./src/routes/itemCategoryRoutes.js");
+const cloudSyncRouter = require("./src/sync/cloudSyncRouter");
+
 
 const path = require("path");
 
@@ -176,6 +178,12 @@ app.use(async (req, res, next) => {
       });
       isConnected = true;
       console.log("MongoDB connected successfully");
+      
+      // Initialize cloud sync router after DB connection
+      if (!app.locals.syncRouterInitialized) {
+        app.use("/sync", cloudSyncRouter(mongoose.connection.db));
+        app.locals.syncRouterInitialized = true;
+      }
     }
     next();
   } catch (error) {
@@ -237,7 +245,8 @@ app.use("/api/gst", gstRoutes);
 app.use("/api/salary", salaryRoutes);
 app.use("/api/gst-numbers", gstNumberRoutes);
 app.use("/api/restaurant-invoices", restaurantInvoiceRoutes);
-app.use("/api/item-categories", itemCategoryRoutes);
+// Cloud sync router will be added after DB connection
+
 
 // Health check endpoint
 app.get("/health", (req, res) => {
