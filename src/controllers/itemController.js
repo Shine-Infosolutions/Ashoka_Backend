@@ -3,7 +3,7 @@ const Item = require('../models/Items');
 const itemController = {
   getAllItems: async (req, res) => {
     try {
-      const items = await Item.find();
+      const items = await Item.find().populate('category', 'name');
       res.json(items);
     } catch (error) {
       res.status(500).json({ error: error.message });
@@ -12,7 +12,7 @@ const itemController = {
 
   getAvailableItems: async (req, res) => {
     try {
-      const items = await Item.find({ status: 'available' });
+      const items = await Item.find({ status: 'available' }).populate('category', 'name');
       res.json(items);
     } catch (error) {
       res.status(500).json({ error: error.message });
@@ -31,7 +31,7 @@ const itemController = {
 
   getItemById: async (req, res) => {
     try {
-      const item = await Item.findById(req.params.id);
+      const item = await Item.findById(req.params.id).populate('category', 'name');
       if (!item) return res.status(404).json({ error: 'Item not found' });
       res.json(item);
     } catch (error) {
