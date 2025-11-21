@@ -8,8 +8,7 @@ const createAndApplyNOC = async (req, res) => {
     const noc = new NOC({
       name,
       authorityType,
-      isCompletelyFree: true,
-      status: 'active'
+      isCompletelyFree: true
     });
     
     await noc.save();
@@ -50,41 +49,6 @@ const getNOCById = async (req, res) => {
   }
 };
 
-// Mark NOC as used
-const markNOCAsUsed = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const noc = await NOC.findByIdAndUpdate(id, { status: 'used' }, { new: true });
-    
-    if (!noc) {
-      return res.status(404).json({ success: false, error: 'NOC not found' });
-    }
-    
-    res.json({ success: true, message: 'NOC marked as used', noc });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-};
-
-// Update NOC status
-const updateStatus = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
-    
-    const noc = await NOC.findByIdAndUpdate(id, { status }, { new: true });
-    
-    if (!noc) {
-      return res.status(404).json({ success: false, error: 'NOC not found' });
-    }
-    
-    res.json({ success: true, message: `NOC status updated to ${status}`, noc });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-};
-
-
 
 // Update NOC
 const updateNOC = async (req, res) => {
@@ -118,8 +82,6 @@ module.exports = {
   createAndApplyNOC,
   getAllNOCs,
   getNOCById,
-  markNOCAsUsed,
-  updateStatus,
   updateNOC,
   deleteNOC
 };

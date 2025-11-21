@@ -3,11 +3,6 @@ const mongoose = require('mongoose');
 const nocSchema = new mongoose.Schema({
   // Basic Details
   name: { type: String, required: true },
-  status: { 
-    type: String, 
-    enum: ['active', 'used'], 
-    default: 'active' 
-  },
   authorityType: { 
     type: String, 
     enum: ['gm', 'manager', 'other'], 
