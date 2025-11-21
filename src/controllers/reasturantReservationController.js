@@ -25,10 +25,31 @@ exports.createReservation = async (req, res) => {
       specialRequests,
       advancePayment
     } = req.body;
-    const reservationNumber = await generateReservationNumber();
 
+    // --------------------------  
+    // ⭐ TIME SLOT OVERLAP CHECK  
+    // --------------------------
+    const existingReservation = await RestaurantReservation.findOne({
+      reservationDate: reservationDate,  // same date
+      $or: [
+        {
+          reservationTimeIn: { $lt: reservationTimeOut },
+          reservationTimeOut: { $gt: reservationTimeIn }
+        }
+      ]
+    });
+
+    if (existingReservation) {
+      return res.status(400).json({
+        success: false,
+        message: "This time slot is already booked. Please choose another time."
+      });
+    }
+
+    // Generate reservation number
+    const reservationNumber = await generateReservationNumber();
     const status = (advancePayment && advancePayment > 0) ? 'reserved' : 'enquiry';
-    
+
     const reservation = new RestaurantReservation({
       reservationNumber,
       guestName,
@@ -36,7 +57,7 @@ exports.createReservation = async (req, res) => {
       email,
       partySize,
       reservationDate,
-      reservationTimeIn,  
+      reservationTimeIn,
       reservationTimeOut,
       specialRequests,
       advancePayment: advancePayment || 0,
@@ -50,6 +71,61 @@ exports.createReservation = async (req, res) => {
     res.status(400).json({ error: error.message });
   }
 };
+
+exports.getAvailableSlots = async (req, res) => {
+  try {
+    const { date } = req.query;
+
+    if (!date) {
+      return res.status(400).json({ error: "Reservation date is required" });
+    }
+
+    const reservationDate = new Date(date);
+
+    // Restaurant timing
+    const openingHour = 10;  // 10 am
+    const closingHour = 23;  // 11 pm
+    const slotDuration = 60; // minutes (change to 30 if needed)
+
+    // Generate all possible slots
+    let slots = [];
+    for (let hour = openingHour; hour < closingHour; hour++) {
+      const start = `${String(hour).padStart(2, '0')}:00`;
+      const end = `${String(hour + 1).padStart(2, '0')}:00`;
+
+      slots.push({
+        start,
+        end
+      });
+    }
+
+    // Fetch all bookings for that date
+    const reservations = await RestaurantReservation.find({
+      reservationDate: reservationDate
+    });
+
+    // Filter out booked slots
+    const availableSlots = slots.filter(slot => {
+      const isBooked = reservations.some(res =>
+        res.reservationTimeIn < slot.end &&
+        res.reservationTimeOut > slot.start
+      );
+      return !isBooked;
+    });
+
+    res.json({
+      date,
+      totalSlots: slots.length,
+      availableSlotsCount: availableSlots.length,
+      availableSlots
+    });
+
+  } catch (error) {
+    console.error("Error getting available slots", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 
 exports.getAllReservations = async (req, res) => {
   try {

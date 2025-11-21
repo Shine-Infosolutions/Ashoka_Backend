@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const itemSchema = new mongoose.Schema({
   name: { type: String, required: true },
   Price: { type: Number, required: true },
-  category: { type: String, required: true },
+  category: { type: mongoose.Schema.Types.ObjectId, ref: 'ItemCategory', required: true },
   Discount: { type: Number, default: 0 },
   status: { type: String, enum: ['available', 'unavailable'], default: 'available' },
   in_oostock: { type: Boolean, default: true },

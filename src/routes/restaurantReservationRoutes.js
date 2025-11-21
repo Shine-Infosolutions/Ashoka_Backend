@@ -5,6 +5,7 @@ const { authMiddleware } = require('../middleware/authMiddleware');
 const router = express.Router();
 
 router.post('/create', authMiddleware(['admin', 'staff', 'restaurant']), restaurantReservationController.createReservation);
+router.get("/available-slots", authMiddleware(['admin', 'staff', 'restaurant']), restaurantReservationController.getAvailableSlots);
 router.get('/all', restaurantReservationController.getAllReservations);
 router.get('/:id', restaurantReservationController.getReservationById);
 router.put('/:id', authMiddleware(['admin', 'staff', 'restaurant']), restaurantReservationController.updateReservation);
