@@ -50,9 +50,9 @@ exports.createOrder = async (req, res) => {
     for (const item of items) {
       if (item.isFree && item.nocId) {
         const noc = await NOC.findById(item.nocId);
-        if (!noc || noc.status !== 'active') {
+        if (!noc) {
           return res.status(400).json({
-            error: `Invalid or inactive NOC for item ${item.itemId}`
+            error: `Invalid NOC for item ${item.itemId}`
           });
         }
       }
@@ -89,12 +89,7 @@ exports.createOrder = async (req, res) => {
     const order = new RestaurantOrder(orderData);
     await order.save();
 
-    // ✅ Mark NOCs as used for free items
-    for (const item of populatedItems) {
-      if (item.isFree && item.nocId) {
-        await NOC.findByIdAndUpdate(item.nocId, { status: 'used' });
-      }
-    }
+    // ✅ NOCs don't need status updates in current schema
 
     // ✅ Auto-create KOT
     const kotNumber = await generateKOTNumber();
