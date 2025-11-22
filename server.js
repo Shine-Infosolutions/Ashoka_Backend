@@ -102,17 +102,29 @@ io.on('connection', (socket) => {
   
   // Join rooms
   socket.on("join-waiter-dashboard", () => {
-    socket.join("waiters");
+    if (!socket.rooms.has("waiters")) {
+      socket.join("waiters");
+    } else {
+      return;
+    }
     console.log(`👨‍🍳 Socket ${socket.id} joined waiters room`);
   });
   
   socket.on("join-pantry-updates", () => {
-    socket.join("pantry-updates");
+    if (!socket.rooms.has("pantry-updates")) {
+      socket.join("pantry-updates");
+    } else {
+      return;
+    }
     console.log(`🥫 Socket ${socket.id} joined pantry-updates room`);
   });
   
   socket.on("join-kitchen-updates", () => {
-    socket.join("kitchen-updates");
+    if (!socket.rooms.has("kitchen-updates")) {
+      socket.join("kitchen-updates");
+    } else {
+      return;
+    }
     console.log(`🍳 Socket ${socket.id} joined kitchen-updates room`);
   });
   
