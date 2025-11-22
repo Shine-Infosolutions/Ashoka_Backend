@@ -16,6 +16,34 @@ const getMealInclusions = (planPackage) => {
   return mealPlans[planPackage] || { breakfast: false, lunch: false, dinner: false };
 };
 
+// 🔹 Tax Calculation Logic
+const calculateTaxAmounts = (rate, cgstRate = 0.025, sgstRate = 0.025, taxIncluded = false) => {
+  if (!rate || rate <= 0) {
+    return { taxableAmount: 0, cgstAmount: 0, sgstAmount: 0 };
+  }
+
+  let taxableAmount, cgstAmount, sgstAmount;
+
+  if (taxIncluded) {
+    // Tax is included in the rate
+    const totalTaxRate = cgstRate + sgstRate;
+    taxableAmount = rate / (1 + totalTaxRate);
+    cgstAmount = taxableAmount * cgstRate;
+    sgstAmount = taxableAmount * sgstRate;
+  } else {
+    // Tax is additional to the rate
+    taxableAmount = rate;
+    cgstAmount = taxableAmount * cgstRate;
+    sgstAmount = taxableAmount * sgstRate;
+  }
+
+  return {
+    taxableAmount: Math.round(taxableAmount * 100) / 100,
+    cgstAmount: Math.round(cgstAmount * 100) / 100,
+    sgstAmount: Math.round(sgstAmount * 100) / 100
+  };
+};
+
 // 🔹 Convert Reservation to Booking
 exports.convertReservationToBooking = async (req, res) => {
   try {
@@ -35,6 +63,14 @@ exports.convertReservationToBooking = async (req, res) => {
     }
 
     const grcNo = await generateGRC();
+
+    // Calculate tax amounts
+    const taxCalculation = calculateTaxAmounts(
+      reservation.rate,
+      additionalDetails.cgstRate || 0.025,
+      additionalDetails.sgstRate || 0.025,
+      additionalDetails.taxIncluded || false
+    );
 
     // Map reservation data to booking format
     const bookingData = {
@@ -64,6 +100,9 @@ exports.convertReservationToBooking = async (req, res) => {
       noOfAdults: reservation.noOfAdults,
       noOfChildren: reservation.noOfChildren,
       rate: reservation.rate,
+      taxableAmount: taxCalculation.taxableAmount,
+      cgstAmount: taxCalculation.cgstAmount,
+      sgstAmount: taxCalculation.sgstAmount,
       
       arrivedFrom: reservation.arrivalFrom,
       purposeOfVisit: reservation.purposeOfVisit,
@@ -141,6 +180,14 @@ exports.bookRoom = async (req, res) => {
         const grcNo = await generateGRC();
         const reservationId = extraDetails.reservationId || null;
 
+        // Calculate tax amounts
+        const taxCalculation = calculateTaxAmounts(
+          extraDetails.rate,
+          extraDetails.cgstRate || 0.025,
+          extraDetails.sgstRate || 0.025,
+          extraDetails.taxIncluded || false
+        );
+
         // Create booking document according to updated flat schema
         const booking = new Booking({
           grcNo,
@@ -182,6 +229,11 @@ exports.bookRoom = async (req, res) => {
           noOfAdults: extraDetails.noOfAdults,
           noOfChildren: extraDetails.noOfChildren,
           rate: extraDetails.rate,
+          taxableAmount: taxCalculation.taxableAmount,
+          cgstAmount: taxCalculation.cgstAmount,
+          sgstAmount: taxCalculation.sgstAmount,
+          cgstRate: extraDetails.cgstRate || 0.025,
+          sgstRate: extraDetails.sgstRate || 0.025,
           taxIncluded: extraDetails.taxIncluded,
           serviceCharge: extraDetails.serviceCharge,
 
@@ -472,6 +524,20 @@ exports.updateBooking = async (req, res) => {
     const booking = await Booking.findById(bookingId);
     if (!booking) return res.status(404).json({ error: 'Booking not found' });
 
+    // Recalculate tax if rate or tax settings are updated
+    if (updates.rate || updates.cgstRate || updates.sgstRate || updates.taxIncluded !== undefined) {
+      const taxCalculation = calculateTaxAmounts(
+        updates.rate || booking.rate,
+        updates.cgstRate || booking.cgstRate || 0.025,
+        updates.sgstRate || booking.sgstRate || 0.025,
+        updates.taxIncluded !== undefined ? updates.taxIncluded : booking.taxIncluded
+      );
+      
+      booking.taxableAmount = taxCalculation.taxableAmount;
+      booking.cgstAmount = taxCalculation.cgstAmount;
+      booking.sgstAmount = taxCalculation.sgstAmount;
+    }
+
     // Update allowed simple fields directly on booking document
     const simpleFields = [
       'salutation', 'name', 'age', 'gender', 'address', 'city', 'nationality',
@@ -481,7 +547,7 @@ exports.updateBooking = async (req, res) => {
 
       'idProofType', 'idProofNumber', 'idProofImageUrl', 'idProofImageUrl2', 'photoUrl',
 
-      'roomNumber', 'planPackage', 'noOfAdults', 'noOfChildren', 'rate', 'taxIncluded', 'serviceCharge',
+      'roomNumber', 'planPackage', 'noOfAdults', 'noOfChildren', 'rate', 'cgstRate', 'sgstRate', 'taxIncluded', 'serviceCharge',
 
       'arrivedFrom', 'destination', 'remark', 'businessSource', 'marketSegment', 'purposeOfVisit',
 
