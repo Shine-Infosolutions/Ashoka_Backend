@@ -55,10 +55,13 @@ const bookingSchema = new mongoose.Schema({
   }],
   roomRates: [{
     roomNumber: { type: String, required: true },
-    customRate: { type: Number, default: 0 }
+    customRate: { type: Number, default: 0 },
+    extraBed: { type: Boolean, default: false },
+    extraBedStartDate: { type: Date, default: null }
   }],
   extraBed: { type: Boolean, default: false },
   extraBedCharge: { type: Number, default: 0 },
+  extraBedRooms: [{ type: String }], // Array of room numbers that have extra beds
   rate: { type: Number },
   taxableAmount: { type: Number },
   cgstAmount: { type: Number },

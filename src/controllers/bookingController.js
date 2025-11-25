@@ -30,12 +30,14 @@ const validateRoomGuestDetails = (roomGuestDetails, roomNumber) => {
 // 🔹 Room Rates Validation
 const validateRoomRates = (roomRates, roomNumber, defaultRate = 0) => {
   if (!roomRates || !Array.isArray(roomRates)) {
-    return roomNumber ? [{ roomNumber, customRate: defaultRate }] : [];
+    return roomNumber ? [{ roomNumber, customRate: defaultRate, extraBed: false, extraBedStartDate: null }] : [];
   }
   
   return roomRates.map(rate => ({
     roomNumber: rate.roomNumber || roomNumber,
-    customRate: Math.max(0, rate.customRate || 0)
+    customRate: Math.max(0, rate.customRate || 0),
+    extraBed: rate.extraBed || false,
+    extraBedStartDate: rate.extraBedStartDate || null
   }));
 };
 
@@ -271,6 +273,7 @@ exports.bookRoom = async (req, res) => {
           roomRates: validatedRoomRates,
           extraBed: extraDetails.extraBed || false,
           extraBedCharge: extraBedCharge,
+          extraBedRooms: extraDetails.extraBedRooms || [],
           rate: totalRate,
           taxableAmount: finalTaxCalculation.taxableAmount,
           cgstAmount: finalTaxCalculation.cgstAmount,
@@ -581,11 +584,16 @@ exports.updateBooking = async (req, res) => {
       booking.extraBed = updates.extraBed;
       if (!updates.extraBed) {
         booking.extraBedCharge = 0;
+        booking.extraBedRooms = [];
       }
     }
     
     if (updates.extraBedCharge !== undefined && booking.extraBed) {
       booking.extraBedCharge = Math.max(0, updates.extraBedCharge);
+    }
+    
+    if (updates.extraBedRooms !== undefined) {
+      booking.extraBedRooms = Array.isArray(updates.extraBedRooms) ? updates.extraBedRooms : [];
     }
 
     // Recalculate tax if rate, extra bed, or tax settings are updated
@@ -618,7 +626,7 @@ exports.updateBooking = async (req, res) => {
 
       'idProofType', 'idProofNumber', 'idProofImageUrl', 'idProofImageUrl2', 'photoUrl',
 
-      'roomNumber', 'planPackage', 'noOfAdults', 'noOfChildren', 'roomGuestDetails', 'roomRates', 'extraBed', 'extraBedCharge', 'rate', 'cgstRate', 'sgstRate', 'taxIncluded', 'serviceCharge',
+      'roomNumber', 'planPackage', 'noOfAdults', 'noOfChildren', 'roomGuestDetails', 'roomRates', 'extraBed', 'extraBedCharge', 'extraBedRooms', 'rate', 'cgstRate', 'sgstRate', 'taxIncluded', 'serviceCharge',
 
       'arrivedFrom', 'destination', 'remark', 'businessSource', 'marketSegment', 'purposeOfVisit',
 
