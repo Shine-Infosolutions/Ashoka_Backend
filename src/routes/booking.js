@@ -60,6 +60,12 @@ router.post(
   bookingController.extendBooking
 );
 
+// ✅ Amend booking stay dates only (admin or staff from 'reception')
+router.put(
+  "/amend-stay/:bookingId",
+  bookingController.amendBookingStay
+);
+
 // ✅ Checkout booking (admin or staff from 'reception')
 router.post(
   "/checkout/:bookingId",

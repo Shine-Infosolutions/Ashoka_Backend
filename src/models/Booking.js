@@ -121,6 +121,25 @@ const bookingSchema = new mongoose.Schema({
       approvedBy: String
     }
   ],
+  // 🔹 Amendment History
+  amendmentHistory: [
+    {
+      originalCheckIn: { type: Date },
+      originalCheckOut: { type: Date },
+      originalDays: { type: Number },
+      newCheckIn: { type: Date },
+      newCheckOut: { type: Date },
+      newDays: { type: Number },
+      amendedOn: { type: Date, default: Date.now },
+      reason: String,
+      rateAdjustment: { type: Number, default: 0 },
+      extraBedAdjustment: { type: Number, default: 0 },
+      totalAdjustment: { type: Number, default: 0 },
+      status: { type: String, enum: ['Pending', 'Approved', 'Rejected'], default: 'Approved' },
+      approvedBy: String,
+      approvedOn: Date
+    }
+  ],
 }, { timestamps: true });
 
 module.exports = mongoose.models.Booking || mongoose.model('Booking', bookingSchema);

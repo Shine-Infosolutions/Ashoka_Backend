@@ -643,6 +643,11 @@ exports.updateBooking = async (req, res) => {
       'bookingDate', 'numberOfRooms', 'checkInDate', 'checkOutDate', 'days', 'timeIn', 'timeOut'
     ];
 
+    // Handle amendment history updates
+    if (updates.amendmentHistory) {
+      booking.amendmentHistory = updates.amendmentHistory;
+    }
+
     simpleFields.forEach(field => {
       if (typeof updates[field] !== 'undefined') {
         booking[field] = updates[field];
@@ -724,6 +729,173 @@ exports.extendBooking = async (req, res) => {
       success: true,
       message: 'Booking extended successfully',
       booking
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// 🔹 Amend booking stay dates
+exports.amendBookingStay = async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+    const { newCheckOutDate, reason } = req.body;
+
+    if (!newCheckOutDate) {
+      return res.status(400).json({ error: 'New check-out date is required' });
+    }
+
+    const booking = await Booking.findById(bookingId);
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    if (!booking.isActive) {
+      return res.status(400).json({ error: 'Cannot amend inactive booking' });
+    }
+
+    if (booking.status === 'Checked Out') {
+      return res.status(400).json({ error: 'Cannot amend checked out booking' });
+    }
+
+    // Check amendment limits
+    const amendmentCount = booking.amendmentHistory?.length || 0;
+    if (amendmentCount >= 3) {
+      return res.status(400).json({ error: 'Maximum 3 amendments allowed per booking' });
+    }
+
+    // Check if amendment is within allowed timeframe (24 hours before checkout)
+    const currentTime = new Date();
+    const originalCheckOut = new Date(booking.checkOutDate);
+    const timeDiffHours = (originalCheckOut - currentTime) / (1000 * 60 * 60);
+    
+    if (timeDiffHours < 24) {
+      return res.status(400).json({ error: 'Cannot amend booking within 24 hours of checkout' });
+    }
+
+    // Check if the same rooms are available for the new dates
+    const roomNumbers = booking.roomNumber.split(',').map(num => num.trim());
+    const originalCheckIn = booking.checkInDate; // Keep original check-in date
+    const newCheckOut = new Date(newCheckOutDate);
+    
+    // Calculate new days
+    const timeDiff = newCheckOut.getTime() - originalCheckIn.getTime();
+    const newDays = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
+
+    if (newDays <= 0) {
+      return res.status(400).json({ error: 'Check-out date must be after original check-in date' });
+    }
+
+    // Check room availability for new dates (excluding current booking)
+    for (const roomNumber of roomNumbers) {
+      const conflictingBookings = await Booking.find({
+        _id: { $ne: bookingId }, // Exclude current booking
+        roomNumber: { $regex: new RegExp(`(^|,)\\s*${roomNumber}\\s*(,|$)`) },
+        status: { $in: ['Booked', 'Checked In'] },
+        isActive: true,
+        $or: [
+          {
+            checkInDate: { $lt: newCheckOut },
+            checkOutDate: { $gt: originalCheckIn }
+          }
+        ]
+      });
+
+      if (conflictingBookings.length > 0) {
+        return res.status(400).json({ 
+          error: `Room ${roomNumber} is not available for the extended dates`,
+          conflictingBookings: conflictingBookings.map(b => ({
+            grcNo: b.grcNo,
+            checkIn: b.checkInDate,
+            checkOut: b.checkOutDate
+          }))
+        });
+      }
+    }
+
+    // Store original dates for history
+    const originalCheckOutDate = booking.checkOutDate;
+    const originalDays = booking.days;
+
+    // Calculate rate adjustment
+    let rateAdjustment = 0;
+    if (booking.roomRates && Array.isArray(booking.roomRates)) {
+      const dailyRate = booking.roomRates.reduce((sum, room) => sum + (room.customRate || 0), 0);
+      rateAdjustment = dailyRate * (newDays - originalDays);
+    }
+
+    // Calculate extra bed adjustment
+    let extraBedAdjustment = 0;
+    if (booking.roomRates && Array.isArray(booking.roomRates)) {
+      extraBedAdjustment = booking.roomRates.reduce((sum, room) => {
+        if (!room.extraBed) return sum;
+        const extraBedDays = newDays;
+        const originalExtraBedDays = originalDays;
+        return sum + ((booking.extraBedCharge || 0) * (extraBedDays - originalExtraBedDays));
+      }, 0);
+    }
+
+    // Calculate amendment fee (₹500 for each amendment after first)
+    const amendmentFee = amendmentCount > 0 ? 500 : 0;
+    
+    const totalAdjustment = rateAdjustment + extraBedAdjustment + amendmentFee;
+    const newTaxableAmount = (booking.taxableAmount || 0) + totalAdjustment;
+    const newCgstAmount = newTaxableAmount * (booking.cgstRate || 0.025);
+    const newSgstAmount = newTaxableAmount * (booking.sgstRate || 0.025);
+    const newTotalAmount = newTaxableAmount + newCgstAmount + newSgstAmount;
+
+    // Add amendment to history
+    if (!booking.amendmentHistory) {
+      booking.amendmentHistory = [];
+    }
+    
+    booking.amendmentHistory.push({
+      originalCheckIn,
+      originalCheckOut: originalCheckOutDate,
+      originalDays,
+      newCheckIn: originalCheckIn, // Keep same check-in date
+      newCheckOut: newCheckOut,
+      newDays,
+      amendedOn: new Date(),
+      reason: reason || 'Customer requested checkout date change',
+      rateAdjustment,
+      extraBedAdjustment,
+      totalAdjustment,
+      amendmentFee,
+      status: 'Approved',
+      approvedBy: 'System',
+      approvedOn: new Date()
+    });
+
+    // Update booking with new checkout date only
+    booking.checkOutDate = newCheckOut;
+    booking.days = newDays;
+    booking.taxableAmount = newTaxableAmount;
+    booking.cgstAmount = newCgstAmount;
+    booking.sgstAmount = newSgstAmount;
+    booking.rate = newTotalAmount;
+
+    await booking.save();
+
+    // Send notification (implement your notification service)
+    try {
+      console.log(`Amendment notification sent for booking ${booking.grcNo}`);
+    } catch (notificationError) {
+      console.error('Failed to send amendment notification:', notificationError);
+    }
+
+    res.json({
+      success: true,
+      message: 'Booking stay amended successfully',
+      booking,
+      amendment: {
+        originalDates: { checkIn: originalCheckIn, checkOut: originalCheckOutDate, days: originalDays },
+        newDates: { checkIn: originalCheckIn, checkOut: newCheckOut, days: newDays },
+        rateAdjustment,
+        extraBedAdjustment,
+        totalAdjustment,
+        newTotalAmount
+      }
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
