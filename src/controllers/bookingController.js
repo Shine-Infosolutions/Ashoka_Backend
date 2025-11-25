@@ -16,6 +16,29 @@ const getMealInclusions = (planPackage) => {
   return mealPlans[planPackage] || { breakfast: false, lunch: false, dinner: false };
 };
 
+// 🔹 Room Guest Details Validation
+const validateRoomGuestDetails = (roomGuestDetails, roomNumber) => {
+  if (!roomGuestDetails || !Array.isArray(roomGuestDetails)) return [];
+  
+  return roomGuestDetails.map(detail => ({
+    roomNumber: detail.roomNumber || roomNumber,
+    adults: Math.max(1, detail.adults || 1),
+    children: Math.max(0, detail.children || 0)
+  }));
+};
+
+// 🔹 Room Rates Validation
+const validateRoomRates = (roomRates, roomNumber, defaultRate = 0) => {
+  if (!roomRates || !Array.isArray(roomRates)) {
+    return roomNumber ? [{ roomNumber, customRate: defaultRate }] : [];
+  }
+  
+  return roomRates.map(rate => ({
+    roomNumber: rate.roomNumber || roomNumber,
+    customRate: Math.max(0, rate.customRate || 0)
+  }));
+};
+
 // 🔹 Tax Calculation Logic
 const calculateTaxAmounts = (rate, cgstRate = 0.025, sgstRate = 0.025, taxIncluded = false) => {
   if (!rate || rate <= 0) {
@@ -188,6 +211,22 @@ exports.bookRoom = async (req, res) => {
           extraDetails.taxIncluded || false
         );
 
+        // Validate and process room guest details and rates
+        const validatedGuestDetails = validateRoomGuestDetails(extraDetails.roomGuestDetails, room.room_number);
+        const validatedRoomRates = validateRoomRates(extraDetails.roomRates, room.room_number, extraDetails.rate);
+        
+        // Calculate extra bed charge if applicable
+        const extraBedCharge = extraDetails.extraBed ? (extraDetails.extraBedCharge || 0) : 0;
+        const totalRate = (extraDetails.rate || 0) + extraBedCharge;
+        
+        // Recalculate tax with extra bed charge included
+        const finalTaxCalculation = calculateTaxAmounts(
+          totalRate,
+          extraDetails.cgstRate || 0.025,
+          extraDetails.sgstRate || 0.025,
+          extraDetails.taxIncluded || false
+        );
+
         // Create booking document according to updated flat schema
         const booking = new Booking({
           grcNo,
@@ -228,10 +267,14 @@ exports.bookRoom = async (req, res) => {
           planPackage: extraDetails.planPackage,
           noOfAdults: extraDetails.noOfAdults,
           noOfChildren: extraDetails.noOfChildren,
-          rate: extraDetails.rate,
-          taxableAmount: taxCalculation.taxableAmount,
-          cgstAmount: taxCalculation.cgstAmount,
-          sgstAmount: taxCalculation.sgstAmount,
+          roomGuestDetails: validatedGuestDetails,
+          roomRates: validatedRoomRates,
+          extraBed: extraDetails.extraBed || false,
+          extraBedCharge: extraBedCharge,
+          rate: totalRate,
+          taxableAmount: finalTaxCalculation.taxableAmount,
+          cgstAmount: finalTaxCalculation.cgstAmount,
+          sgstAmount: finalTaxCalculation.sgstAmount,
           cgstRate: extraDetails.cgstRate || 0.025,
           sgstRate: extraDetails.sgstRate || 0.025,
           taxIncluded: extraDetails.taxIncluded,
@@ -524,15 +567,43 @@ exports.updateBooking = async (req, res) => {
     const booking = await Booking.findById(bookingId);
     if (!booking) return res.status(404).json({ error: 'Booking not found' });
 
-    // Recalculate tax if rate or tax settings are updated
-    if (updates.rate || updates.cgstRate || updates.sgstRate || updates.taxIncluded !== undefined) {
+    // Handle roomGuestDetails and roomRates updates
+    if (updates.roomGuestDetails) {
+      booking.roomGuestDetails = validateRoomGuestDetails(updates.roomGuestDetails, booking.roomNumber);
+    }
+    
+    if (updates.roomRates) {
+      booking.roomRates = validateRoomRates(updates.roomRates, booking.roomNumber, booking.rate);
+    }
+    
+    // Handle extra bed updates
+    if (updates.extraBed !== undefined) {
+      booking.extraBed = updates.extraBed;
+      if (!updates.extraBed) {
+        booking.extraBedCharge = 0;
+      }
+    }
+    
+    if (updates.extraBedCharge !== undefined && booking.extraBed) {
+      booking.extraBedCharge = Math.max(0, updates.extraBedCharge);
+    }
+
+    // Recalculate tax if rate, extra bed, or tax settings are updated
+    if (updates.rate || updates.extraBed !== undefined || updates.extraBedCharge !== undefined || 
+        updates.cgstRate || updates.sgstRate || updates.taxIncluded !== undefined) {
+      
+      const baseRate = updates.rate !== undefined ? updates.rate : booking.rate || 0;
+      const extraBedCharge = booking.extraBed ? (booking.extraBedCharge || 0) : 0;
+      const totalRate = baseRate + extraBedCharge;
+      
       const taxCalculation = calculateTaxAmounts(
-        updates.rate || booking.rate,
+        totalRate,
         updates.cgstRate || booking.cgstRate || 0.025,
         updates.sgstRate || booking.sgstRate || 0.025,
         updates.taxIncluded !== undefined ? updates.taxIncluded : booking.taxIncluded
       );
       
+      booking.rate = totalRate;
       booking.taxableAmount = taxCalculation.taxableAmount;
       booking.cgstAmount = taxCalculation.cgstAmount;
       booking.sgstAmount = taxCalculation.sgstAmount;
@@ -547,7 +618,7 @@ exports.updateBooking = async (req, res) => {
 
       'idProofType', 'idProofNumber', 'idProofImageUrl', 'idProofImageUrl2', 'photoUrl',
 
-      'roomNumber', 'planPackage', 'noOfAdults', 'noOfChildren', 'rate', 'cgstRate', 'sgstRate', 'taxIncluded', 'serviceCharge',
+      'roomNumber', 'planPackage', 'noOfAdults', 'noOfChildren', 'roomGuestDetails', 'roomRates', 'extraBed', 'extraBedCharge', 'rate', 'cgstRate', 'sgstRate', 'taxIncluded', 'serviceCharge',
 
       'arrivedFrom', 'destination', 'remark', 'businessSource', 'marketSegment', 'purposeOfVisit',
 
