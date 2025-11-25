@@ -735,7 +735,7 @@ exports.extendBooking = async (req, res) => {
   }
 };
 
-// 🔹 Amend booking stay dates
+// Amend booking stay dates
 exports.amendBookingStay = async (req, res) => {
   try {
     const { bookingId } = req.params;
