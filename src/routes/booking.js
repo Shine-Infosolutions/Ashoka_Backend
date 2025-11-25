@@ -61,8 +61,8 @@ router.post(
 );
 
 // ✅ Amend booking stay dates only (admin or staff from 'reception')
-router.put(
-  "/amend-stay/:bookingId",
+router.post(
+  "/amend/:bookingId",
   bookingController.amendBookingStay
 );
 
