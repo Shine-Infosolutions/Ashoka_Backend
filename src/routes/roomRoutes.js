@@ -21,7 +21,7 @@ router.get('/category/:categoryId', roomController.getRoomsByCategory);
 // Update room status directly
 router.put('/status/:id', authMiddleware(['admin', 'staff'], ['reception', 'housekeeping']), roomController.updateRoomStatus);
 
-// Get all available rooms
-router.get('/available', roomController.getAvailableRooms);
+// Get category inventory template
+router.get('/:categoryId/inventory-template', roomController.getCategoryInventoryTemplate);
 
 module.exports = router;

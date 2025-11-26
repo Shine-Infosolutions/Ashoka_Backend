@@ -10,32 +10,49 @@ exports.createRoom = async (req, res) => {
       category,
       room_number,
       price,
+      floor_number,
+      bed_type,
       extra_bed,
       is_reserved,
       status,
       description,
       images,
+      inventory_items
     } = req.body;
 
     // Auto-fill price from category if not provided
     let roomPrice = price;
-    if (!price && category) {
-      const categoryDoc = await Category.findById(category);
+    let roomInventoryItems = inventory_items || [];
+    
+    if (category) {
+      const categoryDoc = await Category.findById(category).populate('inventory_template.item_id');
       if (categoryDoc) {
-        roomPrice = categoryDoc.base_price;
+        if (!price) {
+          roomPrice = categoryDoc.base_price;
+        }
+        // Auto-fill inventory from category template if not provided
+        if (!inventory_items && categoryDoc.inventory_template.length > 0) {
+          roomInventoryItems = categoryDoc.inventory_template.map(item => ({
+            item_id: item.item_id._id,
+            required_qty: item.required_qty
+          }));
+        }
       }
     }
 
     const room = new Room({
       title,
       category,
-      room_number, // Ensure room_number is included
+      room_number,
       price: roomPrice,
+      floor_number,
+      bed_type,
       extra_bed,
       is_reserved,
       status,
       description,
       images,
+      inventory_items: roomInventoryItems
     });
     await room.save();
 
@@ -181,7 +198,7 @@ exports.updateRoomStatus = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
     
-    if (!status || !['available', 'reserved', 'booked', 'maintenance'].includes(status)) {
+    if (!status || !['available', 'occupied', 'cleaning', 'maintenance', 'blocked'].includes(status)) {
       return res.status(400).json({ error: "Invalid status value" });
     }
     
@@ -275,3 +292,23 @@ exports.getAvailableRooms = async (req, res) => {
   }
 };
 
+// Get category inventory template
+exports.getCategoryInventoryTemplate = async (req, res) => {
+  try {
+    const { categoryId } = req.params;
+    const category = await Category.findById(categoryId)
+      .populate('inventory_template.item_id', 'name unit')
+      .select('inventory_template');
+    
+    if (!category) {
+      return res.status(404).json({ error: "Category not found" });
+    }
+    
+    res.json({ 
+      success: true, 
+      inventory_template: category.inventory_template 
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
