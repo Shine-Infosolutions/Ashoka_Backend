@@ -16,11 +16,21 @@ exports.createRoom = async (req, res) => {
       description,
       images,
     } = req.body;
+
+    // Auto-fill price from category if not provided
+    let roomPrice = price;
+    if (!price && category) {
+      const categoryDoc = await Category.findById(category);
+      if (categoryDoc) {
+        roomPrice = categoryDoc.base_price;
+      }
+    }
+
     const room = new Room({
       title,
       category,
       room_number, // Ensure room_number is included
-      price,
+      price: roomPrice,
       extra_bed,
       is_reserved,
       status,
