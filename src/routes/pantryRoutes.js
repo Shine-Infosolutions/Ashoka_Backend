@@ -2,12 +2,13 @@ const express = require("express");
 const router = express.Router();
 const pantryController = require("../controllers/pantryController");
 const unitMasterController = require("../controllers/unitMasterController");
-const { authMiddleware } = require("../middleware/authMiddleware");
+const { auth, authorize } = require("../middleware/auth");
 
 // Unit Master Routes for Pantry
 router.get(
   "/units",
-  authMiddleware(["admin", "staff", "pantry"]),
+  auth,
+  authorize("ADMIN", "GM", "STAFF"),
   unitMasterController.getUnits
 );
 
@@ -19,7 +20,8 @@ router.get(
 
 router.get(
   "/items/low-stock",
-  authMiddleware(["admin", "staff", "pantry"], ["pantry", "reception"]),
+  auth,
+  authorize("ADMIN", "GM", "STAFF"),
   pantryController.getLowStockPantryItems
 );
 
@@ -30,87 +32,101 @@ router.post(
 
 router.put(
   "/items/:id",
-  authMiddleware(["admin", "staff", "pantry"], ["pantry"]),
+  auth,
+  authorize("ADMIN", "GM", "STAFF"),
   pantryController.updatePantryItem
 );
 
 router.delete(
   "/items/:id",
-  authMiddleware(["admin"]),
+  auth,
+  authorize("ADMIN"),
   pantryController.deletePantryItem
 );
 
 router.patch(
   "/items/:id/stock",
-  authMiddleware(["admin", "staff", "pantry"], ["pantry"]),
+  auth,
+  authorize("ADMIN", "GM", "STAFF"),
   pantryController.updatePantryStock
 );
 
 router.get(
   "/invoice/low-stock",
-  authMiddleware(["admin", "staff"], ["pantry"]),
+  auth,
+  authorize("ADMIN", "GM", "STAFF"),
   pantryController.generateLowStockInvoice
 );
 
 router.get(
   "/invoices/vendor",
-  authMiddleware(["admin", "staff"], ["pantry"]),
+  auth,
+  authorize("ADMIN", "GM", "STAFF"),
   pantryController.generateVendorInvoice
 );
 
 // Pantry Orders Routes
 router.get(
   "/orders",
-  authMiddleware(["admin", "staff", "pantry"]),
+  auth,
+  authorize("ADMIN", "GM", "STAFF"),
   pantryController.getPantryOrders
 );
 
 router.get(
   "/orders/:id",
-  authMiddleware(["admin", "staff", "pantry"]),
+  auth,
+  authorize("ADMIN", "GM", "STAFF"),
   pantryController.getPantryOrderById
 );
 
 router.post(
   "/orders",
-  authMiddleware(["admin", "staff", "pantry"], ["kitchen", "pantry"]),
+  auth,
+  authorize("ADMIN", "GM", "STAFF"),
   pantryController.createPantryOrder
 );
 
 router.put(
   "/orders/:id",
-  authMiddleware(["admin", "staff", "pantry"]),
+  auth,
+  authorize("ADMIN", "GM", "STAFF"),
   pantryController.updatePantryOrder
 );
 
 router.patch(
   "/orders/:id/status",
-  authMiddleware(["admin", "staff", "pantry"]),
+  auth,
+  authorize("ADMIN", "GM", "STAFF"),
   pantryController.updatePantryOrderStatus
 );
 
 router.patch(
   "/orders/:orderId/payment-status",
-  authMiddleware(["admin", "staff", "pantry"]),
+  auth,
+  authorize("ADMIN", "GM", "STAFF"),
   pantryController.updatePaymentStatus
 );
 
 router.delete(
   "/orders/:id",
-  authMiddleware(["admin"]),
+  auth,
+  authorize("ADMIN"),
   pantryController.deletePantryOrder
 );
 
 // Fulfillment Routes
 router.post(
   "/upload-pricing-image",
-  authMiddleware(["admin", "staff"], ["pantry", "reception"]),
+  auth,
+  authorize("ADMIN", "GM", "STAFF"),
   pantryController.uploadPricingImage
 );
 
 router.post(
   "/upload-chalan",
-  authMiddleware(["admin", "staff"], ["pantry", "reception"]),
+  auth,
+  authorize("ADMIN", "GM", "STAFF"),
   pantryController.uploadChalan
 );
 
@@ -121,43 +137,50 @@ router.post(
 
 router.get(
   "/disbursement-history",
-  authMiddleware(["admin", "staff"], ["pantry"]),
+  auth,
+  authorize("ADMIN", "GM", "STAFF"),
   pantryController.getDisbursementHistory
 );
 
 router.put(
   "/fulfill-invoice/:orderId",
-  authMiddleware(["admin", "staff"], ["pantry", "reception"]),
+  auth,
+  authorize("ADMIN", "GM", "STAFF"),
   pantryController.fulfillInvoice
 );
 
 router.get(
   "/fulfillment-history/:orderId",
-  authMiddleware(["admin", "staff"], ["pantry", "reception"]),
+  auth,
+  authorize("ADMIN", "GM", "STAFF"),
   pantryController.getFulfillmentHistory
 );
 
 router.get(
   "/orders/excel-report",
-  authMiddleware(["admin", "staff"], ["pantry", "reception"]),
+  auth,
+  authorize("ADMIN", "GM", "STAFF"),
   pantryController.generatePantryOrdersExcel
 );
 
 router.get(
   "/vendor-analytics/:vendorId",
-  authMiddleware(["admin", "staff", "pantry"]),
+  auth,
+  authorize("ADMIN", "GM", "STAFF"),
   pantryController.getVendorAnalytics
 );
 
 router.get(
   "/suggested-vendors",
-  authMiddleware(["admin", "staff", "pantry"]),
+  auth,
+  authorize("ADMIN", "GM", "STAFF"),
   pantryController.getSuggestedVendors
 );
 
 router.get(
   "/items/excel-report",
-  authMiddleware(["admin", "staff"], ["pantry", "reception"]),
+  auth,
+  authorize("ADMIN", "GM", "STAFF"),
   pantryController.generatePantryItemsExcel
 );
 

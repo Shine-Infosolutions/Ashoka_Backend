@@ -1,10 +1,10 @@
 const mongoose = require('mongoose');
 
 const bookingSchema = new mongoose.Schema({
+  bookingNo: { type: String, unique: true, index: true },
   grcNo: { type: String, unique: true, required: true },  // Guest Registration Card No
-    reservationId: { type: mongoose.Schema.Types.ObjectId, ref: 'Reservation', default: null },
-    
-    categoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Category' },
+  invoiceNumber: { type: String, unique: true },  // Invoice number like HH/12/0001
+  categoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Category' },
 
   bookingDate: { type: Date, default: Date.now },
   numberOfRooms: { type: Number, default: 1 },
@@ -17,6 +17,23 @@ const bookingSchema = new mongoose.Schema({
     type: String,
     default: '12:00',
     immutable: true 
+  },
+  
+  // 🔹 Exact Check-in/Check-out Times
+  actualCheckInTime: { type: Date },  // Exact timestamp when guest checked in
+  actualCheckOutTime: { type: Date }, // Exact timestamp when guest checked out
+  
+  // 🔹 Late Checkout Fine System
+  lateCheckoutFine: {
+    amount: { type: Number, default: 0 },
+    minutesLate: { type: Number, default: 0 },
+    finePerHour: { type: Number, default: 500 }, // ₹500 per hour after grace period
+    gracePeriodMinutes: { type: Number, default: 15 }, // 15 minutes grace period
+    applied: { type: Boolean, default: false },
+    appliedAt: { type: Date },
+    waived: { type: Boolean, default: false },
+    waivedBy: { type: String },
+    waivedReason: { type: String }
   },  
 
   salutation: { type: String, enum: ['mr.', 'mrs.', 'ms.', 'dr.', 'other'], default: 'mr.' },
@@ -37,15 +54,14 @@ const bookingSchema = new mongoose.Schema({
 
   idProofType: {
     type: String,
-    enum: ['Aadhaar', 'PAN', 'Voter ID', 'Passport', 'Driving License', 'Other'],
-    required: true
+    enum: ['Aadhaar', 'PAN', 'Voter ID', 'Passport', 'Driving License', 'Other']
   },  idProofNumber: { type: String },
   idProofImageUrl: { type: String },
   idProofImageUrl2: { type: String },
   photoUrl: { type: String },
 
   roomNumber: { type: String },
-  planPackage: { type: String, enum: ['CP', 'MAP', 'AP', 'EP'] },
+  planPackage: { type: String }, //cp map/ mp
   noOfAdults: { type: Number },
   noOfChildren: { type: Number },
   roomGuestDetails: [{
@@ -55,6 +71,7 @@ const bookingSchema = new mongoose.Schema({
   }],
   roomRates: [{
     roomNumber: { type: String, required: true },
+    roomId: { type: mongoose.Schema.Types.ObjectId, ref: 'Room' }, // Store actual room _id
     customRate: { type: Number, default: 0 },
     extraBed: { type: Boolean, default: false },
     extraBedStartDate: { type: Date, default: null }
@@ -80,6 +97,7 @@ const bookingSchema = new mongoose.Schema({
 
   discountPercent: { type: Number, default: 0 },
   discountRoomSource: { type: Number, default: 0 },
+  discountNotes: { type: String },
 
   paymentMode: { type: String },
   paymentStatus: { 
@@ -87,6 +105,19 @@ const bookingSchema = new mongoose.Schema({
     enum: ['Pending', 'Paid', 'Failed', 'Partial'],
     default: 'Pending'
   },
+  transactionId: { type: String },
+
+  // Multiple Advance Payments
+  advancePayments: [{
+    amount: { type: Number, required: true },
+    paymentMode: { type: String },
+    paymentDate: { type: Date, default: Date.now },
+    reference: { type: String },
+    notes: { type: String },
+    createdAt: { type: Date, default: Date.now }
+  }],
+  totalAdvanceAmount: { type: Number, default: 0 },
+  balanceAmount: { type: Number, default: 0 },
 
   bookingRefNo: { type: String },
   
@@ -121,6 +152,7 @@ const bookingSchema = new mongoose.Schema({
       approvedBy: String
     }
   ],
+
   // 🔹 Amendment History
   amendmentHistory: [
     {
@@ -140,6 +172,75 @@ const bookingSchema = new mongoose.Schema({
       approvedOn: Date
     }
   ],
+
+  // 🔹 Soft Delete
+  deleted: { type: Boolean, default: false },
+  deletedAt: { type: Date },
+  deletedBy: { type: String },
 }, { timestamps: true });
+
+// Critical indexes for performance
+bookingSchema.index({ bookingNo: 1 }, { unique: true });
+bookingSchema.index({ grcNo: 1 }, { unique: true });
+bookingSchema.index({ invoiceNumber: 1 }, { unique: true, sparse: true });
+bookingSchema.index({ deleted: 1, status: 1, checkInDate: 1 });
+bookingSchema.index({ deleted: 1, createdAt: -1 });
+bookingSchema.index({ mobileNo: 1, deleted: 1 });
+bookingSchema.index({ roomNumber: 1, checkInDate: 1, checkOutDate: 1 });
+
+// Optimized pre-save middleware
+bookingSchema.pre('save', async function(next) {
+  if (!this.bookingNo) {
+    let unique = false;
+    while (!unique) {
+      const bookingNo = `BK${Date.now()}${Math.random().toString(36).substr(2, 3)}`;
+      const existing = await this.constructor.findOne({ bookingNo }).lean();
+      if (!existing) {
+        this.bookingNo = bookingNo;
+        unique = true;
+      }
+    }
+  }
+  
+  if (!this.invoiceNumber) {
+    const month = String(new Date().getMonth() + 1).padStart(2, '0');
+    const lastInvoice = await this.constructor.findOne(
+      { deleted: { $ne: true }, invoiceNumber: { $exists: true, $ne: null } },
+      { invoiceNumber: 1 }
+    ).sort({ createdAt: -1 }).lean();
+    
+    let nextNum = 1;
+    if (lastInvoice && lastInvoice.invoiceNumber) {
+      const parts = lastInvoice.invoiceNumber.split('/');
+      if (parts.length === 3) {
+        nextNum = parseInt(parts[2]) + 1;
+      }
+    }
+    this.invoiceNumber = `HH/${month}/${String(nextNum).padStart(4, '0')}`;
+  }
+  
+  if (this.actualCheckOutTime && this.status === 'Checked Out' && !this.lateCheckoutFine.applied && this.timeOut) {
+    const [hours, minutes] = this.timeOut.split(':').map(Number);
+    const expectedTime = new Date(this.checkOutDate);
+    expectedTime.setHours(hours, minutes, 0, 0);
+    
+    const timeDiff = new Date(this.actualCheckOutTime) - expectedTime;
+    if (timeDiff > 0) {
+      const minutesLate = Math.ceil(timeDiff / 60000);
+      const gracePeriod = this.lateCheckoutFine.gracePeriodMinutes || 15;
+      
+      if (minutesLate > gracePeriod && minutesLate <= 1440) {
+        const chargeableMinutes = minutesLate - gracePeriod;
+        const chargeableHours = Math.ceil(chargeableMinutes / 60);
+        this.lateCheckoutFine.minutesLate = minutesLate;
+        this.lateCheckoutFine.amount = chargeableHours * (this.lateCheckoutFine.finePerHour || 500);
+        this.lateCheckoutFine.applied = true;
+        this.lateCheckoutFine.appliedAt = new Date();
+      }
+    }
+  }
+  
+  next();
+});
 
 module.exports = mongoose.models.Booking || mongoose.model('Booking', bookingSchema);

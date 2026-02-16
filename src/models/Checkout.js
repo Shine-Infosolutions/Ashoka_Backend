@@ -11,6 +11,7 @@ const checkoutSchema = new mongoose.Schema({
   restaurantCharges: { type: Number, default: 0 },
   laundryCharges: { type: Number, default: 0 },
   inspectionCharges: { type: Number, default: 0 },
+  roomServiceCharges: { type: Number, default: 0 },
   bookingCharges: { type: Number, default: 0 },
   
   // Service items details
@@ -55,6 +56,20 @@ const checkoutSchema = new mongoose.Schema({
   totalAmount: { type: Number, required: true },
   pendingAmount: { type: Number, default: 0 },
   
+  // Invoice details
+  invoiceNumber: {
+    type: String,
+    unique: true,
+    sparse: true
+  },
+  invoiceGenerated: {
+    type: Boolean,
+    default: false
+  },
+  invoiceGeneratedAt: {
+    type: Date
+  },
+  
   status: {
     type: String,
     enum: ['pending', 'paid', 'partial'],
@@ -65,7 +80,7 @@ const checkoutSchema = new mongoose.Schema({
 // Calculate total amount before saving
 checkoutSchema.pre('save', function(next) {
   this.totalAmount = (this.restaurantCharges || 0) + (this.laundryCharges || 0) + 
-                    (this.inspectionCharges || 0) + (this.bookingCharges || 0);
+                    (this.inspectionCharges || 0) + (this.roomServiceCharges || 0) + (this.bookingCharges || 0);
   next();
 });
 

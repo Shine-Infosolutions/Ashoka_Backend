@@ -1,20 +1,24 @@
 const express = require('express');
 const router = express.Router();
 const categoryController = require('../controllers/categoryController');
+const { auth, authorize } = require('../middleware/auth');
 
-// Create a new category
-router.post('/add', categoryController.createCategory);
+// Create a new room category (Admin, GM)
+router.post('/add', auth, authorize(['ADMIN', 'GM','FRONT DESK']), categoryController.createCategory);
 
-// Get all categories
-router.get('/all', categoryController.getCategories);
+// Get all room categories (All roles)
+router.get('/all', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), categoryController.getCategories);
 
-// Get a category by ID
-router.get('/get/:id', categoryController.getCategoryById);
+// Get categories with rooms in one call (All roles)
+router.get('/with-rooms', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), categoryController.getCategoriesWithRooms);
 
-// Update a category
-router.put('/update/:id', categoryController.updateCategory);
+// Get a room category by ID (All roles)
+router.get('/get/:id', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), categoryController.getCategoryById);
 
-// Delete a category
-router.delete('/delete/:id', categoryController.deleteCategory);
+// Update a room category (Admin, GM)
+router.put('/update/:id', auth, authorize(['ADMIN', 'GM','FRONT DESK']), categoryController.updateCategory);
+
+// Delete a room category (Admin only)
+router.delete('/delete/:id', auth, authorize('ADMIN'), categoryController.deleteCategory);
 
 module.exports = router; 

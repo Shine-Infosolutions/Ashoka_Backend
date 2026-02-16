@@ -1,57 +1,69 @@
 const mongoose = require('mongoose');
 
 const housekeepingSchema = new mongoose.Schema({
-  roomId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Room',
+  roomNumber: {
+    type: String,
+    required: true
   },
-  bookingId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Booking',
+  taskType: {
+    type: String,
+    enum: ['cleaning', 'maintenance', 'inspection', 'deep_cleaning'],
+    required: true
   },
   status: {
     type: String,
-    enum: ['pending', 'in-progress', 'cleaning', 'completed', 'verified'],
+    enum: ['pending', 'in_progress', 'completed', 'cancelled'],
     default: 'pending'
-  },
-  cleaningType: {
-    type: String,
-    enum: ['daily', 'deep-clean', 'checkout', 'special-request'],
-    required: true
-  },
-  assignedTo: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  },
-  notes: String,
-  startTime: Date,
-  endTime: Date,
-  verifiedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
   },
   priority: {
     type: String,
     enum: ['low', 'medium', 'high', 'urgent'],
     default: 'medium'
   },
-  images: {
-    before: [{
-      url: String,
-      uploadedAt: Date
-    }],
-    after: [{
-      url: String,
-      uploadedAt: Date
-    }]
+  assignedTo: {
+    type: String,
+    required: true
   },
-  issues: [{
-    description: String,
-    resolved: {
+  description: {
+    type: String,
+    required: true
+  },
+  notes: {
+    type: String
+  },
+  estimatedTime: {
+    type: Number, // in minutes
+    default: 30
+  },
+  actualTime: {
+    type: Number // in minutes
+  },
+  startTime: {
+    type: Date
+  },
+  completedTime: {
+    type: Date
+  },
+  createdBy: {
+    type: String,
+    required: true
+  },
+  grcNo: {
+    type: String
+  },
+  checklistItems: [{
+    item: String,
+    completed: {
       type: Boolean,
       default: false
     }
+  }],
+  images: [{
+    url: String,
+    description: String
   }]
-}, { timestamps: true });
+}, {
+  timestamps: true
+});
 
-module.exports = mongoose.models.Housekeeping || mongoose.model('Housekeeping', housekeepingSchema);
+module.exports = mongoose.model('Housekeeping', housekeepingSchema);

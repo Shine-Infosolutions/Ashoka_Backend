@@ -5,7 +5,7 @@ const RoomSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  category: {
+  categoryId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Category',
     required: true
@@ -19,13 +19,6 @@ const RoomSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
-  floor_number: {
-    type: String
-  },
-  bed_type: {
-    type: String,
-    enum: ['single', 'double', 'queen', 'king', 'twin']
-  },
   extra_bed: {
     type: Boolean,
     default: false
@@ -36,7 +29,7 @@ const RoomSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['available', 'occupied', 'cleaning', 'maintenance', 'blocked'],
+    enum: ['available', 'reserved', 'booked', 'maintenance'], // ✅ Added "reserved"
     default: 'available'
   },
   description: {
@@ -44,16 +37,6 @@ const RoomSchema = new mongoose.Schema({
   },
   images: [{
     type: String
-  }],
-  inventory_items: [{
-    item_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Inventory'
-    },
-    required_qty: {
-      type: Number,
-      default: 0
-    }
   }]
 }, { timestamps: true });
 

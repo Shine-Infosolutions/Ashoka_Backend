@@ -1,6 +1,49 @@
 const Room = require("../models/Room.js");
 const Category = require("../models/Category.js");
 const Booking = require("../models/Booking.js");
+const cloudinary = require('../utils/cloudinary');
+const { getAuditLogModel } = require('../models/AuditLogModel');
+
+// Helper function to create audit log
+const createAuditLog = (action, recordId, userId, userRole, oldData, newData, req) => {
+  setImmediate(async () => {
+    try {
+      const AuditLog = await getAuditLogModel();
+      await AuditLog.create({
+        action,
+        module: 'ROOM',
+        recordId,
+        userId: userId || 'SYSTEM',
+        userRole: userRole || 'SYSTEM',
+        oldData,
+        newData,
+        ipAddress: req?.ip || req?.connection?.remoteAddress,
+        userAgent: req?.get('User-Agent')
+      });
+    } catch (error) {
+      console.error('❌ Audit log creation failed:', error);
+    }
+  });
+};
+
+// Upload base64 image to Cloudinary
+const uploadBase64ToCloudinary = async (base64String) => {
+  try {
+    if (!process.env.CLOUDINARY_API_KEY || process.env.CLOUDINARY_API_KEY === 'your_api_key') {
+      console.warn('Cloudinary not configured, skipping image upload');
+      return base64String;
+    }
+    
+    const result = await cloudinary.uploader.upload(base64String, {
+      folder: 'ashoka-rooms',
+      transformation: [{ width: 800, height: 600, crop: 'limit' }]
+    });
+    return result.secure_url;
+  } catch (error) {
+    console.warn('Image upload failed, using base64 fallback:', error.message);
+    return base64String;
+  }
+};
 
 // Create a new room
 exports.createRoom = async (req, res) => {
@@ -10,57 +53,46 @@ exports.createRoom = async (req, res) => {
       category,
       room_number,
       price,
-      floor_number,
-      bed_type,
       extra_bed,
       is_reserved,
       status,
       description,
       images,
-      inventory_items
     } = req.body;
-
-    // Auto-fill price from category if not provided
-    let roomPrice = price;
-    let roomInventoryItems = inventory_items || [];
-    
-    if (category) {
-      const categoryDoc = await Category.findById(category).populate('inventory_template.item_id');
-      if (categoryDoc) {
-        if (!price) {
-          roomPrice = categoryDoc.base_price;
-        }
-        // Auto-fill inventory from category template if not provided
-        if (!inventory_items && categoryDoc.inventory_template.length > 0) {
-          roomInventoryItems = categoryDoc.inventory_template.map(item => ({
-            item_id: item.item_id._id,
-            required_qty: item.required_qty
-          }));
+    // Handle image uploads
+    let uploadedImages = [];
+    if (images && Array.isArray(images)) {
+      for (const image of images) {
+        if (image.startsWith('data:')) {
+          const uploadedUrl = await uploadBase64ToCloudinary(image);
+          uploadedImages.push(uploadedUrl);
+        } else {
+          uploadedImages.push(image);
         }
       }
     }
-
+    
     const room = new Room({
       title,
-      category,
-      room_number,
-      price: roomPrice,
-      floor_number,
-      bed_type,
+      categoryId: category,
+      room_number, // Ensure room_number is included
+      price,
       extra_bed,
       is_reserved,
       status,
       description,
-      images,
-      inventory_items: roomInventoryItems
+      images: uploadedImages,
     });
     await room.save();
+
+    // Create audit log
+    await createAuditLog('CREATE', room._id, req.user?.id, req.user?.role, null, room.toObject(), req);
 
     // Count rooms per category and get all room numbers for the created room's category
     const categories = await Room.aggregate([
       {
         $group: {
-          _id: "$category",
+          _id: "$categoryId",
           count: { $sum: 1 },
           roomNumbers: { $push: "$room_number" },
         },
@@ -93,18 +125,27 @@ exports.createRoom = async (req, res) => {
 // Get all rooms
 exports.getRooms = async (req, res) => {
   try {
-    const rooms = await Room.find().populate("category");
-    
-    // Map rooms to ensure safe access to category properties
-    const safeRooms = rooms.map(room => {
-      const roomObj = room.toObject();
-      if (!roomObj.category) {
-        roomObj.category = { name: 'Unknown' };
+    const rooms = await Room.aggregate([
+      {
+        $lookup: {
+          from: 'categories',
+          localField: 'categoryId',
+          foreignField: '_id',
+          as: 'categoryId',
+          pipeline: [{ $project: { name: 1 } }]
+        }
+      },
+      { $unwind: { path: '$categoryId', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          title: 1, room_number: 1, price: 1, extra_bed: 1,
+          is_reserved: 1, status: 1, description: 1, images: 1,
+          categoryId: { $ifNull: ['$categoryId', { name: 'Unknown' }] }
+        }
       }
-      return roomObj;
-    });
+    ]);
     
-    res.json(safeRooms);
+    res.json(rooms);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -113,14 +154,14 @@ exports.getRooms = async (req, res) => {
 // Get a room by ID
 exports.getRoomById = async (req, res) => {
   try {
-    const room = await Room.findById(req.params.id).populate("category");
+    const room = await Room.findById(req.params.id).populate("categoryId");
     if (!room) return res.status(404).json({ error: "Room not found" });
     
     // Ensure safe access to category properties
     const safeRoom = room.toObject();
-    if (!safeRoom.category) {
-      safeRoom.category = { name: 'Unknown' };
-    }
+    if (!safeRoom.categoryId) {
+      safeRoom.categoryId = { name: 'Unknown' };
+    };
     
     res.json(safeRoom);
   } catch (error) {
@@ -132,11 +173,33 @@ exports.getRoomById = async (req, res) => {
 exports.updateRoom = async (req, res) => {
   try {
     const updates = req.body;
+    
+    // Get original data for audit log
+    const originalRoom = await Room.findById(req.params.id);
+    if (!originalRoom) return res.status(404).json({ error: "Room not found" });
+    
+    // Handle image uploads if provided
+    if (updates.images && Array.isArray(updates.images)) {
+      const uploadedImages = [];
+      for (const image of updates.images) {
+        if (image.startsWith('data:')) {
+          const uploadedUrl = await uploadBase64ToCloudinary(image);
+          uploadedImages.push(uploadedUrl);
+        } else {
+          uploadedImages.push(image);
+        }
+      }
+      updates.images = uploadedImages;
+    }
+    
     const room = await Room.findByIdAndUpdate(req.params.id, updates, {
       new: true,
       runValidators: true,
     });
-    if (!room) return res.status(404).json({ error: "Room not found" });
+
+    // Create audit log
+    await createAuditLog('UPDATE', room._id, req.user?.id, req.user?.role, originalRoom.toObject(), room.toObject(), req);
+
     res.json(room);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -146,8 +209,13 @@ exports.updateRoom = async (req, res) => {
 // Delete a room
 exports.deleteRoom = async (req, res) => {
   try {
-    const room = await Room.findByIdAndDelete(req.params.id);
+    const room = await Room.findById(req.params.id);
     if (!room) return res.status(404).json({ error: "Room not found" });
+
+    // Create audit log
+    await createAuditLog('DELETE', room._id, req.user?.id, req.user?.role, room.toObject(), null, req);
+
+    await Room.findByIdAndDelete(req.params.id);
     res.json({ message: "Room deleted" });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -159,18 +227,22 @@ exports.getRoomsByCategory = async (req, res) => {
   try {
     const { categoryId } = req.params;
 
-    const rooms = await Room.find({ category: categoryId }).populate("category");
-    const activeBookings = await Booking.find({
-      category: categoryId,
-      isActive: true,
+    const [rooms, activeBookings] = await Promise.all([
+      Room.find({ categoryId }, 'title room_number price status').populate('categoryId', 'name').lean(),
+      Booking.find({ categoryId, isActive: true }, 'roomNumber').lean()
+    ]);
+    
+    // Handle comma-separated room numbers in bookings
+    const bookedRoomNumbers = new Set();
+    activeBookings.forEach(booking => {
+      if (booking.roomNumber) {
+        booking.roomNumber.split(',').forEach(num => bookedRoomNumbers.add(num.trim()));
+      }
     });
-    const bookedRoomNumbers = new Set(
-      activeBookings.map((booking) => booking.roomNumber)
-    );
 
     const roomsWithStatus = rooms.map((room) => {
-      // Ensure safe access to category properties
-      const category = room.category || { name: 'Unknown' };
+      const category = room.categoryId || { name: 'Unknown' };
+      const isBooked = bookedRoomNumbers.has(room.room_number.toString());
       
       return {
         _id: room._id,
@@ -178,11 +250,9 @@ exports.getRoomsByCategory = async (req, res) => {
         room_number: room.room_number,
         price: room.price,
         status: room.status,
-        category: category,
-        isBooked: bookedRoomNumbers.has(parseInt(room.room_number)),
-        canSelect:
-          !bookedRoomNumbers.has(parseInt(room.room_number)) &&
-          room.status === "available",
+        categoryId: category,
+        isBooked,
+        canSelect: !isBooked && room.status === "available"
       };
     });
 
@@ -198,15 +268,19 @@ exports.updateRoomStatus = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
     
-    if (!status || !['available', 'occupied', 'cleaning', 'maintenance', 'blocked'].includes(status)) {
+    if (!status || !['available', 'reserved', 'booked', 'maintenance'].includes(status)) {
       return res.status(400).json({ error: "Invalid status value" });
     }
     
     const room = await Room.findById(id);
     if (!room) return res.status(404).json({ error: "Room not found" });
     
+    const originalData = room.toObject();
     room.status = status;
     await room.save();
+    
+    // Create audit log
+    await createAuditLog('UPDATE', room._id, req.user?.id, req.user?.role, originalData, room.toObject(), req);
     
     res.json({ success: true, room });
   } catch (error) {
@@ -226,89 +300,67 @@ exports.getAvailableRooms = async (req, res) => {
       });
     }
 
-    const checkIn = new Date(checkInDate);
-    const checkOut = new Date(checkOutDate);
+    const checkIn = new Date(checkInDate + 'T00:00:00.000Z');
+    const checkOut = new Date(checkOutDate + 'T23:59:59.999Z');
 
     if (isNaN(checkIn.getTime()) || isNaN(checkOut.getTime())) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid date format" });
+      return res.status(400).json({ success: false, message: "Invalid date format" });
     }
 
-    // Step 1: Find overlapping bookings (rooms that are NOT available)
-    const overlappingBookings = await Booking.find({
-      isActive: true,
-      $or: [
-        {
-          checkInDate: { $lt: checkOut },
-          checkOutDate: { $gt: checkIn },
-        },
-      ],
-    });
+    // Find overlapping bookings and available rooms in parallel
+    const [overlappingBookings, allRooms] = await Promise.all([
+      Booking.find({
+        isActive: true,
+        status: { $in: ['Booked', 'Checked In'] },
+        checkInDate: { $lt: checkOut },
+        checkOutDate: { $gt: checkIn }
+      }, 'roomNumber').lean(),
+      Room.find({}, 'title room_number price description').populate('categoryId', 'name').lean()
+    ]);
 
-    // Step 2: Extract roomNumbers from those bookings
-    const bookedRoomNumbers = overlappingBookings.map(
-      (booking) => booking.roomNumber
-    );
-
-    // Step 3: Find rooms not in that list
-    const availableRooms = await Room.find({
-      room_number: { $nin: bookedRoomNumbers },
-    }).populate("category", "name");
-
-    // Step 4: Group by category
-    const grouped = {};
-
-    availableRooms.forEach((room) => {
-      const catId = room.category?._id?.toString() || "uncategorized";
-      const catName = room.category?.name || "Uncategorized";
-
-      if (!grouped[catId]) {
-        grouped[catId] = {
-          category: catId,
-          categoryName: catName,
-          rooms: [],
-        };
+    // Extract booked room numbers
+    const bookedRoomNumbers = new Set();
+    overlappingBookings.forEach(booking => {
+      if (booking.roomNumber) {
+        booking.roomNumber.split(',').forEach(num => bookedRoomNumbers.add(num.trim()));
       }
-
-      grouped[catId].rooms.push({
-        _id: room._id,
-        title: room.title,
-        room_number: room.room_number,
-        price: room.price,
-        description: room.description,
-        status: room.status,
-      });
     });
+
+    // Filter available rooms and group by category
+    const grouped = {};
+    allRooms.forEach((room) => {
+      if (!bookedRoomNumbers.has(room.room_number)) {
+        const catId = room.categoryId?._id?.toString() || "uncategorized";
+        const catName = room.categoryId?.name || "Uncategorized";
+        
+        if (!grouped[catId]) {
+          grouped[catId] = {
+            category: catId,
+            categoryName: catName,
+            rooms: [],
+          };
+        }
+
+        grouped[catId].rooms.push({
+          _id: room._id,
+          title: room.title,
+          room_number: room.room_number,
+          price: room.price,
+          description: room.description,
+          status: 'available'
+        });
+      }
+    });
+
+    const availableRooms = Object.values(grouped);
+    const totalCount = availableRooms.reduce((sum, cat) => sum + cat.rooms.length, 0);
 
     return res.json({
       success: true,
-      availableRooms: Object.values(grouped),
-      totalCount: availableRooms.length,
+      availableRooms,
+      totalCount
     });
   } catch (err) {
-    console.error("Error in getAvailableRooms:", err);
     return res.status(500).json({ success: false, message: err.message });
-  }
-};
-
-// Get category inventory template
-exports.getCategoryInventoryTemplate = async (req, res) => {
-  try {
-    const { categoryId } = req.params;
-    const category = await Category.findById(categoryId)
-      .populate('inventory_template.item_id', 'name unit')
-      .select('inventory_template');
-    
-    if (!category) {
-      return res.status(404).json({ error: "Category not found" });
-    }
-    
-    res.json({ 
-      success: true, 
-      inventory_template: category.inventory_template 
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
   }
 };

@@ -1,23 +1,65 @@
-const Inventory = require('../models/Inventory');
-const InventoryTransaction = require('../models/InventoryTransaction');
-const RoomInventoryChecklist = require('../models/RoomInventoryChecklist');
+const { Inventory, StockMovement } = require('../models/Inventory');
+const { getAuditLogModel } = require('../models/AuditLogModel');
+const mongoose = require('mongoose');
+
+// Helper function to create audit log (non-blocking)
+const createAuditLog = (action, recordId, userId, userRole, oldData, newData, req) => {
+  // Run asynchronously without blocking main operation
+  setImmediate(async () => {
+    try {
+      const AuditLog = await getAuditLogModel();
+      await AuditLog.create({
+        action,
+        module: 'INVENTORY',
+        recordId,
+        userId: userId || new mongoose.Types.ObjectId(),
+        userRole: userRole || 'SYSTEM',
+        oldData,
+        newData,
+        ipAddress: req?.ip || req?.connection?.remoteAddress,
+        userAgent: req?.get('User-Agent')
+      });
+      console.log(`✅ Audit log created: ${action} for inventory ${recordId}`);
+    } catch (error) {
+      console.error('❌ Audit log creation failed:', error);
+    }
+  });
+};
 
 // Get all inventory items
-exports.getItems = async (req, res) => {
+exports.getAllItems = async (req, res) => {
   try {
-    const items = await Inventory.find().sort({ name: 1 });
-    res.json(items);
+    const items = await Inventory.find().populate('categoryId', 'name').sort({ createdAt: -1 });
+    res.json({ success: true, items });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-// Create inventory item
+// Get inventory item by ID
+exports.getItemById = async (req, res) => {
+  try {
+    const item = await Inventory.findById(req.params.id).populate('categoryId', 'name');
+    if (!item) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+    res.json({ success: true, item });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Create new inventory item
 exports.createItem = async (req, res) => {
   try {
     const item = new Inventory(req.body);
     await item.save();
-    res.status(201).json(item);
+    await item.populate('categoryId', 'name');
+
+    // Create audit log
+    await createAuditLog('CREATE', item._id, req.user?.id, req.user?.role, null, item.toObject(), req);
+
+    res.status(201).json({ success: true, item });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -26,18 +68,22 @@ exports.createItem = async (req, res) => {
 // Update inventory item
 exports.updateItem = async (req, res) => {
   try {
-    const { id } = req.params;
-    const item = await Inventory.findByIdAndUpdate(
-      id,
-      req.body,
-      { new: true, runValidators: true }
-    );
-    
-    if (!item) {
+    // Get original data for audit log
+    const originalItem = await Inventory.findById(req.params.id);
+    if (!originalItem) {
       return res.status(404).json({ error: 'Item not found' });
     }
-    
-    res.json(item);
+
+    const item = await Inventory.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true, runValidators: true }
+    ).populate('categoryId', 'name');
+
+    // Create audit log
+    await createAuditLog('UPDATE', item._id, req.user?.id, req.user?.role, originalItem.toObject(), item.toObject(), req);
+
+    res.json({ success: true, item });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -46,176 +92,187 @@ exports.updateItem = async (req, res) => {
 // Delete inventory item
 exports.deleteItem = async (req, res) => {
   try {
-    const { id } = req.params;
-    const item = await Inventory.findByIdAndDelete(id);
+    const item = await Inventory.findById(req.params.id);
+    if (!item) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+
+    // Create audit log
+    await createAuditLog('DELETE', item._id, req.user?.id, req.user?.role, item.toObject(), null, req);
+
+    await Inventory.findByIdAndDelete(req.params.id);
+    res.json({ success: true, message: 'Item deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Get inventory by category
+exports.getByCategory = async (req, res) => {
+  try {
+    const { categoryId } = req.params;
+    const items = await Inventory.find({ categoryId }).populate('categoryId', 'name').sort({ name: 1 });
+    res.json({ success: true, items });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Search items
+exports.searchItems = async (req, res) => {
+  try {
+    const { query } = req.query;
+    const searchRegex = new RegExp(query, 'i');
     
+    const items = await Inventory.find({
+      $or: [
+        { name: searchRegex },
+        { itemCode: searchRegex },
+        { description: searchRegex },
+        { 'supplier.name': searchRegex }
+      ]
+    }).populate('categoryId', 'name').sort({ name: 1 });
+    
+    res.json({ success: true, items });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Stock In/Out operations
+exports.stockIn = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { quantity, reason, notes } = req.body;
+    
+    const item = await Inventory.findById(id);
     if (!item) {
       return res.status(404).json({ error: 'Item not found' });
     }
     
-    res.json({ message: 'Item deleted successfully' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-// Get all transactions
-exports.getTransactions = async (req, res) => {
-  try {
-    const transactions = await InventoryTransaction.find()
-      .populate('inventoryId', 'name')
-      .populate('userId', 'username')
-      .sort({ createdAt: -1 });
-    
-    res.json({ success: true, transactions });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-// Create transaction
-exports.createTransaction = async (req, res) => {
-  try {
-    const { inventoryId, transactionType, quantity, reason, roomNumber } = req.body;
-    
-    // Get current stock before transaction
-    const item = await Inventory.findById(inventoryId);
-    if (!item) {
-      return res.status(404).json({ error: 'Inventory item not found' });
-    }
-    
-    const previousStock = item.currentStock;
-    let newStock;
-    
-    // Calculate new stock based on transaction type
-    if (transactionType === 'restock' || transactionType === 'return') {
-      newStock = previousStock + parseInt(quantity);
-    } else if (transactionType === 'use' || transactionType === 'transfer') {
-      newStock = previousStock - parseInt(quantity);
-    } else if (transactionType === 'adjustment') {
-      newStock = parseInt(quantity);
-    }
-    
-    const transaction = new InventoryTransaction({
-      inventoryId,
-      transactionType,
-      quantity,
-      reason,
-      roomNumber,
-      previousStock,
-      newStock,
-      userId: req.user.id
-    });
-    
-    await transaction.save();
-    
-    // Update inventory stock
-    item.currentStock = newStock;
+    item.currentStock += parseInt(quantity);
     await item.save();
     
-    res.status(201).json({ success: true, transaction });
+    // Record stock movement
+    const movement = new StockMovement({
+      itemId: id,
+      type: 'stock-in',
+      quantity: parseInt(quantity),
+      reason: reason || 'Stock replenishment',
+      notes: notes || ''
+    });
+    await movement.save();
+    
+    // Create audit log for stock in
+    await createAuditLog('UPDATE', item._id, req.user?.id, req.user?.role, 
+      { currentStock: item.currentStock - parseInt(quantity) }, 
+      { currentStock: item.currentStock, stockMovement: movement.toObject() }, req);
+    
+    res.json({ success: true, item, movement });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 };
 
-// Get transaction history for specific inventory item
-exports.getTransactionHistory = async (req, res) => {
+exports.stockOut = async (req, res) => {
   try {
-    const { inventoryId } = req.params;
+    const { id } = req.params;
+    const { quantity, issuedTo, reason, notes } = req.body;
     
-    const transactions = await InventoryTransaction.find({ inventoryId })
-      .populate('userId', 'username')
-      .sort({ createdAt: -1 });
-    
-    res.json({ success: true, transactions });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-// Get room inventory checklist
-exports.getRoomChecklist = async (req, res) => {
-  try {
-    const { roomId } = req.params;
-    const { taskId } = req.query;
-    
-    console.log('Fetching checklist for roomId:', roomId, 'taskId:', taskId);
-    
-    const checklist = await RoomInventoryChecklist.findOne({ 
-      roomId, 
-      housekeepingTaskId: taskId 
-    }).populate('items.inventoryId', 'name category');
-    
-    if (!checklist || checklist.items.length === 0) {
-      // Get all inventory items when no checklist exists or checklist is empty
-      const allInventory = await Inventory.find({}).sort({ name: 1 });
-      
-      // Get unique items only (one per item name, ignore stock quantity)
-      const uniqueItems = [];
-      const seenNames = new Set();
-      
-      for (const item of allInventory) {
-        if (!seenNames.has(item.name)) {
-          seenNames.add(item.name);
-          uniqueItems.push({
-            _id: item._id,
-            name: item.name,
-            category: item.category
-          });
-        }
-      }
-      
-      return res.json({ items: uniqueItems, checklist: null });
+    const item = await Inventory.findById(id);
+    if (!item) {
+      return res.status(404).json({ error: 'Item not found' });
     }
     
-    res.json({ success: true, checklist });
-  } catch (error) {
-    console.error('Error in getRoomChecklist:', error);
-    res.status(500).json({ error: error.message });
-  }
-};
-
-// Create room inventory checklist
-exports.createRoomChecklist = async (req, res) => {
-  try {
-    const { roomId } = req.params;
-    const { housekeepingTaskId, items } = req.body;
+    if (item.currentStock < parseInt(quantity)) {
+      return res.status(400).json({ error: 'Insufficient stock' });
+    }
     
-    const checklist = new RoomInventoryChecklist({
-      housekeepingTaskId,
-      roomId,
-      checkedBy: req.user.id,
-      items
+    item.currentStock -= parseInt(quantity);
+    await item.save();
+    
+    // Record stock movement
+    const movement = new StockMovement({
+      itemId: id,
+      type: 'stock-out',
+      quantity: parseInt(quantity),
+      issuedTo: issuedTo || '',
+      reason: reason || 'Stock issued',
+      notes: notes || ''
     });
+    await movement.save();
     
-    await checklist.save();
-    res.status(201).json(checklist);
+    // Create audit log for stock out
+    await createAuditLog('UPDATE', item._id, req.user?.id, req.user?.role, 
+      { currentStock: item.currentStock + parseInt(quantity) }, 
+      { currentStock: item.currentStock, stockMovement: movement.toObject() }, req);
+    
+    res.json({ success: true, item, movement });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
+// Get stock movements
+exports.getStockMovements = async (req, res) => {
+  try {
+    const movements = await StockMovement.find()
+      .populate('itemId', 'name itemCode')
+      .sort({ createdAt: -1 })
+      .limit(100);
+    res.json({ success: true, movements });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-// Update checklist
-exports.updateChecklist = async (req, res) => {
+// Get low stock items
+exports.getLowStockItems = async (req, res) => {
   try {
-    const { checklistId } = req.params;
-    const { items, status } = req.body;
-    
-    const updateData = { items };
-    if (status === 'completed') {
-      updateData.status = 'completed';
-      updateData.completedAt = new Date();
-    }
-    
-    const checklist = await RoomInventoryChecklist.findByIdAndUpdate(
-      checklistId, 
-      updateData, 
-      { new: true }
-    );
-    
-    res.json(checklist);
+    const items = await Inventory.find({
+      $expr: { $lte: ['$currentStock', '$minStockLevel'] }
+    }).populate('categoryId', 'name').sort({ currentStock: 1 });
+    res.json({ success: true, items });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+};
+
+// Update stock (reduce quantity)
+exports.updateStock = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { quantity } = req.body;
+    
+    const item = await Inventory.findById(id);
+    if (!item) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+    
+    if (item.currentStock < parseInt(quantity)) {
+      return res.status(400).json({ error: 'Insufficient stock' });
+    }
+    
+    item.currentStock -= parseInt(quantity);
+    await item.save();
+    
+    // Record stock movement
+    const movement = new StockMovement({
+      itemId: id,
+      type: 'stock-out',
+      quantity: parseInt(quantity),
+      reason: 'Room service order',
+      notes: 'Stock reduced via room service'
+    });
+    await movement.save();
+    
+    // Create audit log for stock update
+    await createAuditLog('UPDATE', item._id, req.user?.id, req.user?.role, 
+      { currentStock: item.currentStock + parseInt(quantity) }, 
+      { currentStock: item.currentStock, stockMovement: movement.toObject() }, req);
+    
+    res.json({ success: true, item, movement });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
   }
 };

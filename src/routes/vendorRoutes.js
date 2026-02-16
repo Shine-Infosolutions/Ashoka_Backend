@@ -1,23 +1,26 @@
 const express = require("express");
 const router = express.Router();
 const vendorController = require("../controllers/vendorController");
-const { authMiddleware } = require("../middleware/authMiddleware");
+const { auth, authorize } = require("../middleware/auth");
 
 // Get all vendors
-router.get("/all", authMiddleware(["admin", "staff", "pantry"]), vendorController.getAllVendors);
+router.get("/all", auth, authorize(['ADMIN', 'GM', 'STAFF','FRONT DESK']), vendorController.getAllVendors);
+
+// Get active vendors only (must be before /:id route)
+router.get("/active", auth, authorize(['ADMIN', 'GM', 'STAFF', 'FRONT DESK']), vendorController.getActiveVendors);
 
 // Get single vendor by ID
-router.get("/get/:id", authMiddleware(["admin", "staff", "pantry"]), vendorController.getVendorById);
+router.get("/get/:id", auth, authorize(['ADMIN', 'GM', 'STAFF','FRONT DESK']), vendorController.getVendorById);
 
 // Create vendor
-router.post("/add", authMiddleware(["admin", "staff", "pantry"]), vendorController.createVendor);
+router.post("/add", auth, authorize(['ADMIN', 'GM', 'STAFF','FRONT DESK']), vendorController.createVendor);
 
 // Update vendor
-router.put("/update/:id", authMiddleware(["admin", "staff", "pantry"]), vendorController.updateVendor);
-router.put("/:id", authMiddleware(["admin", "staff", "pantry"]), vendorController.updateVendor);
+router.put("/update/:id", auth, authorize(['ADMIN', 'GM', 'STAFF','FRONT DESK']), vendorController.updateVendor);
+router.put("/:id", auth, authorize(['ADMIN', 'GM', 'STAFF','FRONT DESK']), vendorController.updateVendor);
 
 // Delete vendor
-router.delete("/delete/:id", authMiddleware(["admin"]), vendorController.deleteVendor);
-router.delete("/:id", authMiddleware(["admin"]), vendorController.deleteVendor);
+router.delete("/delete/:id", auth, authorize(['ADMIN']), vendorController.deleteVendor);
+router.delete("/:id", auth, authorize(['ADMIN']), vendorController.deleteVendor);
 
 module.exports = router;

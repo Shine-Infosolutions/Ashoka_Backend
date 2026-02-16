@@ -1,74 +1,52 @@
 const mongoose = require('mongoose');
 
-const InventorySchema = new mongoose.Schema({
-  name: { 
-    type: String, 
-    required: true 
-  },
-  category: { 
-    type: String, 
-    enum: ['Amenity', 'Cleaning', 'Maintenance', 'Food', 'Beverage', 'Linen', 'Toiletry','Snakes','Other'],
+const inventorySchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  itemCode: { type: String, required: true, unique: true },
+  categoryId: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'InventoryCategory',
     required: true
   },
-  currentStock: { 
-    type: Number, 
-    required: true,
-    min: 0
-  },
+  description: { type: String, default: '' },
+  currentStock: { type: Number, default: 0 },
+  minStockLevel: { type: Number, default: 5 },
+  reorderLevel: { type: Number, default: 10 },
   unit: { 
     type: String, 
-    required: true 
-  },
-  minThreshold: { 
-    type: Number, 
-    required: true,
-    min: 0
-  },
-  reorderQuantity: { 
-    type: Number, 
-    required: true,
-    min: 1
-  },
-  costPerUnit: { 
-    type: Number, 
-    required: true 
-  },
-  supplier: { 
-    name: String,
-    contactPerson: String,
-    phone: String,
-    email: String,
-    address: String
+    enum: ['pieces', 'boxes', 'liters', 'packs', 'kg', 'meters'],
+    default: 'pieces' 
   },
   location: { 
     type: String,
-    default: 'Main Storage'
+    enum: ['Store Room', 'Kitchen Store', 'Floor Storage', 'Laundry Room', 'Maintenance Room'],
+    default: 'Store Room'
   },
-  lastReorderDate: { 
-    type: Date 
+  supplier: {
+    name: { type: String, default: '' },
+    contact: { type: String, default: '' }
   },
-  isLowStock: { 
-    type: Boolean, 
-    default: false 
-  },
-  autoReorder: { 
-    type: Boolean, 
-    default: false 
-  },
-  notes: { 
-    type: String 
+  pricePerUnit: { type: Number, default: 0 },
+  lastPurchased: { type: Date },
+  status: { 
+    type: String, 
+    enum: ['active', 'inactive'], 
+    default: 'active' 
   }
 }, { timestamps: true });
 
-// Virtual for checking if reordering is needed
-InventorySchema.virtual('needsReorder').get(function() {
-  return this.currentStock <= this.minThreshold;
-});
+// Stock Movement Schema
+const stockMovementSchema = new mongoose.Schema({
+  itemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Inventory', required: true },
+  type: { type: String, enum: ['stock-in', 'stock-out'], required: true },
+  quantity: { type: Number, required: true },
+  issuedTo: { type: String, default: '' },
+  reason: { type: String, default: '' },
+  notes: { type: String, default: '' },
+  date: { type: Date, default: Date.now }
+}, { timestamps: true });
 
-// Pre-save hook to update isLowStock flag
-InventorySchema.pre('save', function(next) {
-  this.isLowStock = this.currentStock <= this.minThreshold;
-  next();
-});
+const StockMovement = mongoose.model('StockMovement', stockMovementSchema);
+const Inventory = mongoose.model('Inventory', inventorySchema);
 
-module.exports = mongoose.models.Inventory || mongoose.model('Inventory', InventorySchema);
+module.exports = { Inventory, StockMovement };

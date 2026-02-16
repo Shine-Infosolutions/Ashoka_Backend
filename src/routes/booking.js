@@ -1,87 +1,86 @@
 const express = require("express");
 const router = express.Router();
 const bookingController = require("../controllers/bookingController");
-const { authMiddleware } = require("../middleware/authMiddleware");
+const { auth, authorize } = require("../middleware/auth");
+const upload = require("../middleware/upload");
 
-// ✅ Book a room (admin or staff from 'reception')
-router.post(
-  "/book",
-  bookingController.bookRoom
-);
+// Book room (Admin, Front Desk, Staff)
+router.post("/book", auth, authorize(['ADMIN', 'FRONT DESK', 'STAFF']), upload.fields([
+    { name: "idProofImageUrl", maxCount: 1 },
+    { name: "idProofImageUrl2", maxCount: 1 },
+    { name: "photoUrl", maxCount: 1 }
+  ]), bookingController.bookRoom);
 
-// ✅ Get all bookings (admin or staff from 'reception')
-router.get(
-  "/all",
-  bookingController.getBookings
-);
+// Get all bookings (All roles)
+router.get("/all", auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), bookingController.getBookings);
 
-// ✅ Get bookings by category (admin or staff from 'reception')
-router.get(
-  "/category/:categoryId",
-  bookingController.getBookingsByCategory
-);
+// Get bookings by category (All roles)
+router.get("/category/:categoryId", auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), bookingController.getBookingsByCategory);
 
-// get by grc number
-router.get(
-  "/grc/:grcNo",
-  bookingController.getBookingByGRC
-);
+// Get next GRC (Admin, Front Desk, Staff)
+router.get("/next-grc", auth, authorize(['ADMIN', 'FRONT DESK', 'STAFF']), bookingController.getNextGRC);
 
-// ✅ Get booking by ID (admin or staff from 'reception')
-router.get(
-  "/:bookingId",
-  bookingController.getBookingById
-);
-// ✅ Get detail by grc of booking or reservation
-router.get("/fetch-by-grc/:grcNo", bookingController.getDetailsByGrc);
+// Get booking by GRC (All roles)
+router.get("/grc/:grcNo", auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), bookingController.getBookingByGRC);
 
-// ✅ Unbook (soft delete) (admin or staff from 'reception')
-router.delete(
-  "/unbook/:bookingId",
-  bookingController.deleteBooking
-);
+// Fetch details by GRC (All roles)
+router.get("/fetch-by-grc/:grcNo", auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), bookingController.getDetailsByGrc);
 
-// ✅ Permanently delete (admin only)
-router.delete(
-  "/delete/:bookingId",
-  authMiddleware(["admin"]),
-  bookingController.permanentlyDeleteBooking
-);
+// Get customer details by GRC (All roles)
+router.get("/customer/:grcNo", auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), bookingController.getCustomerDetailsByGRC);
 
-// ✅ Update booking (admin or staff from 'reception')
-router.put(
-  "/update/:bookingId",
-  bookingController.updateBooking
-);
+// Search customers (Admin, Front Desk, Staff, Accounts)
+router.get("/search", auth, authorize(['ADMIN', 'FRONT DESK', 'STAFF', 'ACCOUNTS']), bookingController.searchCustomers);
 
-// ✅ Extend booking (admin or staff from 'reception')
-router.post(
-  "/extend/:bookingId",
-  bookingController.extendBooking
-);
+// Get booking by booking number (All roles)
+router.get("/booking-number/:bookingNo", auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), bookingController.getBookingByNumber);
 
-// ✅ Amend booking stay dates only (admin or staff from 'reception')
-router.post(
-  "/amend/:bookingId",
-  bookingController.amendBookingStay
-);
+// Get comprehensive booking details with charges (All roles)
+router.get("/details-with-charges/:bookingId", auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), bookingController.getBookingDetailsWithCharges);
 
-// ✅ Checkout booking (admin or staff from 'reception')
-router.post(
-  "/checkout/:bookingId",
-  bookingController.checkoutBooking
-);
+// Get booking by ID (All roles)
+router.get("/details/:bookingId", auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), bookingController.getCompleteBookingById);
 
-// ✅ Get booking history with invoices
-router.get(
-  "/history/all",
-  bookingController.getBookingHistory
-);
+// Get booking by ID (All roles)
+router.get("/:bookingId", auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), bookingController.getBookingById);
 
-// ✅ Convert reservation to booking
-router.post(
-  "/convert-reservation/:reservationId",
-  bookingController.convertReservationToBooking
-);
+// Fix room availability (Admin only)
+router.post("/fix-rooms", auth, authorize(['ADMIN']), bookingController.fixRoomAvailability);
+
+// Fix booking room numbers (Admin only)
+router.post("/fix-room-numbers", auth, authorize(['ADMIN']), bookingController.fixBookingRoomNumbers);
+
+// Delete booking (Admin only)
+router.delete("/unbook/:bookingId", auth, authorize(['ADMIN']), bookingController.deleteBooking);
+
+// Permanently delete booking (Admin only)
+router.delete("/delete/:bookingId", auth, authorize(['ADMIN']), bookingController.permanentlyDeleteBooking);
+
+// Update booking (Front Desk, Staff, Admin, GM)
+router.put("/update/:bookingId", auth, authorize(['FRONT DESK', 'STAFF', 'ADMIN', 'GM']), bookingController.updateBooking);
+
+// Extend booking (Admin, Front Desk, Staff)
+router.post("/extend/:bookingId", auth, authorize(['ADMIN', 'FRONT DESK', 'STAFF']), bookingController.extendBooking);
+
+// Amend booking stay (Admin, Front Desk, Staff)
+router.post("/amend/:bookingId", auth, authorize(['ADMIN', 'FRONT DESK', 'STAFF']), bookingController.amendBookingStay);
+
+// Get conflicting bookings (Front Desk, Staff, Admin, GM)
+router.get("/conflicts/:bookingId", auth, authorize(['FRONT DESK', 'STAFF', 'ADMIN', 'GM']), bookingController.getConflictingBookings);
+
+// Checkout booking (Admin, Front Desk, Accounts)
+router.post("/checkout/:bookingId", auth, authorize(['ADMIN', 'FRONT DESK', 'ACCOUNTS']), bookingController.checkoutBooking);
+
+// Get booking history (Admin, GM, Accounts)
+router.get("/history/all", auth, authorize(['ADMIN', 'GM', 'ACCOUNTS']), bookingController.getBookingHistory);
+
+// Get booking charges (Front Desk, Accounts, Admin)
+router.get("/charges/booking/:bookingId", auth, authorize(['FRONT DESK', 'ACCOUNTS', 'ADMIN']), bookingController.getBookingCharges);
+
+// Get booking charges by GRC (Front Desk, Accounts, Admin)
+router.get("/charges/grc/:grcNo", auth, authorize(['FRONT DESK', 'ACCOUNTS', 'ADMIN']), bookingController.getBookingCharges);
+
+// Waive late checkout fine (Admin, GM)
+router.post("/waive-fine/:bookingId", auth, authorize(['ADMIN', 'GM','FRONT DESK']), bookingController.waiveLateCheckoutFine);
 
 module.exports = router;

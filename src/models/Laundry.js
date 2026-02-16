@@ -1,111 +1,84 @@
 const mongoose = require("mongoose");
 
 const laundrySchema = new mongoose.Schema({
-  // 🧾 Basic Guest + Room Info
   orderType: {
     type: String,
     enum: ["hotel_laundry", "room_laundry"],
     required: true
   },
   grcNo: String,
+  invoiceNumber: String,
   roomNumber: String,
-  requestedByName: String, // Guest name
-
+  requestedByName: String,
   bookingId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Booking",  
+    ref: "Booking"
   },
-
-  // 🏢 Vendor Assignment
+  serviceType: {
+    type: String,
+    enum: ["inhouse", "vendor"],
+    required: true,
+    default: "inhouse"
+  },
   vendorId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "LaundryVendor"
+    ref: "LaundryVendor",
+    required: function() { return this.serviceType === 'vendor'; }
   },
-
-  // 🧺 Laundry Items
-  items: [
-    {
-      rateId: { type: mongoose.Schema.Types.ObjectId, ref: "LaundryRate", required: true },
-      itemName: String,
-      quantity: { type: Number, default: 1, min: 0 },
-      deliveredQuantity: { type: Number, default: 0, min: 0 },
-      status: {
-        type: String,
-        enum: ["pending", "picked_up", "ready", "delivered", "cancelled"],
-        default: "pending",
-      },
-      calculatedAmount: { type: Number, required: true },
-      damageReported: { type: Boolean, default: false },
-      itemNotes: String,
-    }
-  ],
-
-  // ⚡ Urgency + Special Instructions
-  isUrgent: { type: Boolean, default: false },
-  urgencyNote: String,
-  specialInstructions: String,
-
-  // 🧭 Laundry Process Status
+  items: [{
+    rateId: { type: mongoose.Schema.Types.ObjectId, ref: "LaundryItem", required: true },
+    itemName: String,
+    quantity: { type: Number, default: 1, min: 0 },
+    deliveredQuantity: { type: Number, default: 0, min: 0 },
+    status: {
+      type: String,
+      enum: ["pending", "picked_up", "ready", "delivered", "cancelled", "lost"],
+      default: "pending"
+    },
+    calculatedAmount: { type: Number, default: 0 },
+    damageReported: { type: Boolean, default: false },
+    serviceType: String,
+    itemNotes: String
+  }],
   laundryStatus: {
     type: String,
-    enum: ["pending", "picked_up", "ready", "delivered", "cancelled"],
-    default: "pending",
+    enum: ["pending", "picked_up", "ready", "delivered", "cancelled", "lost"],
+    default: "pending"
   },
-
-  pickupTime: Date,
-  deliveredTime: Date,
-  scheduledPickupTime: Date,
-  scheduledDeliveryTime: Date,
-  pickupBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-  deliveredBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-  receivedBy: String,
-
-  // 🧥 Damage / Loss Tracking
-  damageReported: { type: Boolean, default: false },
-  damageNotes: String,
-  discardReason: String,
-  returnDeadline: Date,
-  lossNote: String,
-  isLost: { type: Boolean, default: false },
-  isFound: { type: Boolean, default: false },
-  foundDate: Date,
-  foundRemarks: String,
-  lostDate: Date,
-
-  // 💰 Billing
-  isBillable: { type: Boolean, default: true }, 
-  totalAmount: { type: Number, required: true },
-  isComplimentary: { type: Boolean, default: false },
-  billStatus: {
-    type: String,
-    enum: ["unpaid", "paid", "waived"],
-    default: "unpaid",
-  },
-
-  isReturned: { type: Boolean, default: false },
-  isCancelled: { type: Boolean, default: false },
-
-  // 📞 Vendor Communication
-  vendorOrderId: String, // vendor's internal order ID
+  totalAmount: { type: Number, default: 0 },
+  vendorOrderId: String,
   vendorNotes: String,
   vendorPickupTime: Date,
   vendorDeliveryTime: Date
-
 }, { timestamps: true });
 
 
-// 🧮 Auto-calc total + auto-fill item name from LaundryRate
 laundrySchema.pre("save", async function (next) {
+  if (this.bookingId && (this.isNew || this.isModified('bookingId'))) {
+    try {
+      const booking = await mongoose.model("Booking").findById(this.bookingId);
+      if (booking) {
+        if (!this.roomNumber) this.roomNumber = booking.roomNumber;
+        if (!this.grcNo) this.grcNo = booking.grcNo;
+        if (!this.requestedByName) this.requestedByName = booking.guestName;
+      }
+    } catch (error) {
+      console.log('Error fetching booking:', error);
+    }
+  }
+
   if (this.items?.length) {
     let total = 0;
     for (let item of this.items) {
       if (item.rateId) {
-        const rateDoc = await mongoose.model("LaundryRate").findById(item.rateId);
-        if (rateDoc) {
-          if (!item.itemName) item.itemName = rateDoc.itemName; 
-          if (!item.calculatedAmount) {
-            item.calculatedAmount = rateDoc.rate * item.quantity;
+        try {
+          const rateDoc = await mongoose.model("LaundryItem").findById(item.rateId);
+          if (rateDoc) {
+            if (!item.itemName) item.itemName = rateDoc.itemName;
+            item.calculatedAmount = rateDoc.rate * (item.quantity || 1);
           }
+        } catch (error) {
+          item.calculatedAmount = 0;
         }
       }
       total += item.calculatedAmount || 0;
@@ -115,9 +88,19 @@ laundrySchema.pre("save", async function (next) {
   next();
 });
 
-// Populate vendor details
 laundrySchema.pre(/^find/, function(next) {
-  this.populate('vendorId', 'vendorName vendorType phoneNumber UpiID');
+  this.populate({
+    path: 'vendorId',
+    select: 'vendorName phoneNumber isActive'
+  })
+  .populate({
+    path: 'bookingId',
+    select: 'roomNumber guestName grcNo'
+  })
+  .populate({
+    path: 'items.rateId',
+    select: 'itemName rate categoryId'
+  });
   next();
 });
 

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { authMiddleware } = require('../middleware/authMiddleware');
+const { auth, authorize } = require('../middleware/auth');
 const {
   getAllKitchenOrders,
   getKitchenOrderById,
@@ -11,11 +11,11 @@ const {
 } = require('../controllers/kitchenOrderController');
 
 // Kitchen Order routes
-router.get('/', authMiddleware(['admin', 'staff', 'restaurant']), getAllKitchenOrders);
-router.get('/:id', authMiddleware(['admin', 'staff', 'restaurant']), getKitchenOrderById);
-router.post('/', authMiddleware(['admin', 'staff', 'restaurant']), createKitchenOrder);
-router.put('/:id', authMiddleware(['admin', 'staff', 'restaurant']), updateKitchenOrder);
-router.delete('/:id', authMiddleware(['admin', 'staff', 'restaurant']), deleteKitchenOrder);
-router.post('/sync', authMiddleware(['admin', 'staff']), syncMissingKitchenOrders);
+router.get('/', auth, authorize('ADMIN', 'GM', 'STAFF'), getAllKitchenOrders);
+router.get('/:id', auth, authorize('ADMIN', 'GM', 'STAFF'), getKitchenOrderById);
+router.post('/', auth, authorize('ADMIN', 'GM', 'STAFF'), createKitchenOrder);
+router.put('/:id', auth, authorize('ADMIN', 'GM', 'STAFF'), updateKitchenOrder);
+router.delete('/:id', auth, authorize('ADMIN'), deleteKitchenOrder);
+router.post('/sync', auth, authorize('ADMIN', 'GM', 'STAFF'), syncMissingKitchenOrders);
 
 module.exports = router;

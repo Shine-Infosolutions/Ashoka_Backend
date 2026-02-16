@@ -30,9 +30,8 @@ const PantryItemSchema = new mongoose.Schema({
     default: 5
   },
   unit: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Unit',
-    required: true
+    type: String,
+    default: 'pcs'
   }  
 }, { timestamps: true });
 

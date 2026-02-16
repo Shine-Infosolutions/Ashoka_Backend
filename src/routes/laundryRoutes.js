@@ -1,59 +1,44 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const laundryController = require("../controllers/laundryController");
-const { authMiddleware } = require("../middleware/authMiddleware");
+const laundryController = require('../controllers/laundryController');
+const { auth, authorize } = require('../middleware/auth');
 
-// Create laundry order
-router.post("/order", laundryController.createLaundryOrder);
+// Order Management
+router.post('/create', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), laundryController.createLaundryOrder);
+router.get('/all', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']),laundryController.getAllLaundryOrders);
+router.get('/available-items', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']),laundryController.getAvailableItems);
+router.get('/booking/:bookingId', auth,authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), laundryController.getLaundryByBooking);
+router.get('/inhouse', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']),laundryController.getInhouseOrders);
+router.get('/vendor-orders', auth,authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), laundryController.getVendorOrders);
+router.get('/vendor/:vendorId', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']),laundryController.getLaundryByVendor);
 
-// Get all laundry orders (optional filter: ?urgent=true)
-router.get("/all", laundryController.getAllLaundryOrders);
+// Status and Dashboard
+router.get('/dashboard', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), laundryController.getLaundryDashboard);
+router.get('/export/csv', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), laundryController.exportLaundryCSV);
+router.get('/items/overview', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), laundryController.getItemStatusOverview);
+router.get('/items/status/:status', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), laundryController.getItemsByStatus);
+router.get('/status/:status', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), laundryController.getLaundryByStatus);
 
-// by grc or room no (using query parameters)
-router.get('/by-grc-or-room', laundryController.getLaundryByGRCOrRoom);
+// Loss Reporting
+router.post('/loss-report', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']),laundryController.createLossReport);
+router.get('/loss-report', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']),laundryController.getAllLossReports);
+router.get('/loss-report/:id', auth,authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), laundryController.getLossReportById);
+router.patch('/loss-report/:id/status', auth,authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), laundryController.updateLossReportStatus);
 
-router.get("/filter-by-date", laundryController.filterLaundryByDate);
+// Dynamic routes (keep at end)
+router.get('/room/:roomNumber', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), laundryController.getLaundryByRoom);
+router.get('/:id', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']),laundryController.getLaundryOrderById);
+router.put('/:id', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']),laundryController.updateLaundryOrder);
+router.patch('/:id/status', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']),laundryController.updateLaundryStatus);
+router.patch('/:id/cancel', auth,authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), laundryController.cancelLaundryOrder);
+router.delete('/:id', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), laundryController.deleteLaundry);
 
-// Get damage and loss reports by date and room
-router.get("/damage-loss-reports", laundryController.getDamageAndLossReports);
+// Item Management
+router.patch('/item/:itemId/status', auth,authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), laundryController.updateItemStatus);
+router.patch('/items/bulk-status', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), laundryController.bulkUpdateItemStatus);
+router.post('/item/:itemId/damage', auth,authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), laundryController.reportDamageOrLoss);
 
-// Get all loss reports
-router.get("/loss-reports", laundryController.getAllLossReports);
-
-// Get laundry order by ID (placed after specific routes to avoid conflicts)
-router.get("/:id", laundryController.getLaundryById);
-
-// Update entire laundry order
-router.put("/:id", laundryController.updateLaundryOrder);
-
-// Add items into existing order
-router.patch("/add-items/:id", laundryController.addItemsToLaundryOrder);
-
-// upd item route 
-router.patch("/item/:laundryId/:itemId", laundryController.updateLaundryItemStatus);
-
-// ✅ Update overall laundry order status
-router.patch("/status/:id", laundryController.updateLaundryStatus);
-
-// Cancel laundry order
-router.patch("/cancel/:id", laundryController.cancelLaundryOrder);
-
-// Mark laundry returned
-router.patch("/return/:id", laundryController.markLaundryReturned);
-
-// Return specific items
-router.post("/return-items", laundryController.returnSpecificItems);
-
-// Get laundry order items for loss reporting
-router.get("/loss-items/:laundryId", laundryController.getLaundryOrderItems);
-
-// Report damage or loss for specific items
-router.post("/damage-loss/:laundryId/:itemId", laundryController.reportDamageOrLoss);
-
-// Create loss report
-router.post("/loss-report", laundryController.createLossReport);
-
-// Delete laundry order
-router.delete("/:id", authMiddleware(["admin"], ["laundry"]), laundryController.deleteLaundry);
+// Vendor Management
+router.patch('/:id/vendor-details', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']),laundryController.updateVendorDetails);
 
 module.exports = router;

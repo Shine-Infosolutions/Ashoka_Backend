@@ -1,16 +1,18 @@
 const express = require('express');
-const kotController = require('../controllers/kotController');
-const { authMiddleware } = require('../middleware/authMiddleware');
-const KOT = require('../models/KOT');
-
 const router = express.Router();
+const kotController = require('../controllers/kotController');
+const { auth, authorize } = require('../middleware/auth');
 
-router.post('/create', authMiddleware(['admin', 'staff', 'restaurant']), kotController.createKOT);
-router.get('/all', authMiddleware(['admin', 'staff', 'restaurant']), kotController.getAllKOTs);
+// Create new KOT (Admin, Staff, Front Desk)
+router.post('/create', auth, authorize(['ADMIN', 'STAFF', 'FRONT DESK']), kotController.createKOT);
 
-router.patch('/:kotId/item-statuses', authMiddleware(['admin', 'staff', 'restaurant']), kotController.updateItemStatuses);
+// Get all KOTs (All roles)
+router.get('/all', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), kotController.getAllKOTs);
 
-router.get('/:id', authMiddleware(['admin', 'staff', 'restaurant']), kotController.getKOTById);
-router.patch('/:id/status', authMiddleware(['admin', 'staff', 'restaurant']), kotController.updateKOTStatus);
+// Update KOT status (Admin, Staff, Front Desk)
+router.patch('/:id/status', auth, authorize(['ADMIN', 'STAFF', 'FRONT DESK']), kotController.updateKOTStatus);
+
+// Update KOT item statuses (Admin, Staff, Front Desk)
+router.patch('/:id/item-statuses', auth, authorize(['ADMIN', 'STAFF', 'FRONT DESK']), kotController.updateItemStatuses);
 
 module.exports = router;

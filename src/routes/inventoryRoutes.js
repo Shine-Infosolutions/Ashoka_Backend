@@ -1,44 +1,42 @@
 const express = require('express');
 const router = express.Router();
 const inventoryController = require('../controllers/inventoryController');
-const { authMiddleware } = require('../middleware/authMiddleware');
+const { auth, authorize } = require('../middleware/auth');
 
-// Get all inventory items
-router.get('/items', authMiddleware(['admin', 'staff']), inventoryController.getItems);
+// Get all inventory items (All roles)
+router.get('/items', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), inventoryController.getAllItems);
 
-// Create inventory item
-router.post('/items', authMiddleware(['admin', 'staff']), inventoryController.createItem);
+// Get inventory item by ID (All roles)
+router.get('/items/:id', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), inventoryController.getItemById);
 
-// Update inventory item
-router.put('/items/:id', authMiddleware(['admin', 'staff']), inventoryController.updateItem);
+// Create new inventory item (Admin, GM)
+router.post('/items', auth, authorize(['ADMIN', 'GM','FRONT DESK']), inventoryController.createItem);
 
-// Delete inventory item
-router.delete('/items/:id', authMiddleware(['admin', 'staff']), inventoryController.deleteItem);
+// Update inventory item (Admin, GM, Staff)
+router.put('/items/:id', auth, authorize(['ADMIN', 'GM', 'STAFF','FRONT DESK']), inventoryController.updateItem);
 
-// Get all transactions
-router.get('/transactions', authMiddleware(['admin', 'staff']), inventoryController.getTransactions);
+// Delete inventory item (Admin only)
+router.delete('/items/:id', auth, authorize('ADMIN'), inventoryController.deleteItem);
 
-// Create transaction
-router.post('/transactions', authMiddleware(['admin', 'staff']), inventoryController.createTransaction);
+// Get items by category (All roles)
+router.get('/category/:categoryId', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), inventoryController.getByCategory);
 
-// Get transaction history for specific item
-router.get('/transactions/:inventoryId', authMiddleware(['admin', 'staff']), inventoryController.getTransactionHistory);
+// Stock in operation (Staff, Admin, GM)
+router.post('/items/:id/stock-in', auth, authorize(['STAFF', 'ADMIN', 'GM','FRONT DESK']), inventoryController.stockIn);
 
-// Room inventory checklist routes
-router.get('/room/:roomId/checklist', authMiddleware(['admin', 'staff']), inventoryController.getRoomChecklist);
-router.post('/room/:roomId/checklist', authMiddleware(['admin', 'staff']), inventoryController.createRoomChecklist);
-router.put('/checklist/:checklistId', authMiddleware(['admin', 'staff']), inventoryController.updateChecklist);
+// Stock out operation (Staff, Admin, GM)
+router.post('/items/:id/stock-out', auth, authorize(['STAFF', 'ADMIN', 'GM','FRONT DESK']), inventoryController.stockOut);
 
-// Debug route to check inventory
-router.get('/debug/count', authMiddleware(['admin', 'staff']), async (req, res) => {
-  try {
-    const Inventory = require('../models/Inventory');
-    const count = await Inventory.countDocuments();
-    const items = await Inventory.find().limit(5);
-    res.json({ count, sampleItems: items });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+// Update stock (Staff, Admin, GM)
+router.put('/items/:id/stock', auth, authorize(['STAFF', 'ADMIN', 'GM','FRONT DESK']), inventoryController.updateStock);
+
+// Get stock movements (Admin, GM, Accounts)
+router.get('/movements', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS','FRONT DESK']), inventoryController.getStockMovements);
+
+// Get low stock items (All roles)
+router.get('/low-stock', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), inventoryController.getLowStockItems);
+
+// Search items (All roles)
+router.get('/search', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), inventoryController.searchItems);
 
 module.exports = router;

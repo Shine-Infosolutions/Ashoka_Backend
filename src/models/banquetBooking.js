@@ -1,12 +1,12 @@
 const mongoose = require("mongoose");
 
 const bookingSchema = new mongoose.Schema({
-  name: { type: String,  trim: true },
-  email: { type: String,  trim: true },
-  number: { type: String,  trim: true },
-  whatsapp: { type: String,  trim: true },
-  pax: { type: Number, },
-  startDate: { type: Date, },
+  name: { type: String, required: true, trim: true },
+  email: { type: String, required: true, trim: true },
+  number: { type: String, required: true, trim: true },
+  whatsapp: { type: String, trim: true },
+  pax: { type: Number, required: true, min: 1 },
+  startDate: { type: Date, required: true },
  gst:{type:Number},
 
   ratePlan: { type: String, },
@@ -67,10 +67,12 @@ default:"Wedding",
 },
 bookingStatus: {
   type: String,
-  enum: ["Tentative", "Confirmed", "Enquiry"], 
+  enum: ["Tentative", "Confirmed", "Enquiry", "Cancelled"], 
   default: "Tentative",
 },
   notes: { type: String, trim: true },
+  menuItems: { type: String, trim: true }, // Comma-separated list of selected menu items
+  categorizedMenu: { type: mongoose.Schema.Types.Mixed, default: {} }, // Menu items organized by category
 
   customerRef: { type: String, unique: true },
   

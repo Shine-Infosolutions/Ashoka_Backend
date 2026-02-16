@@ -1,39 +1,48 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const roomServiceController = require("../controllers/roomServiceController");
-const { authMiddleware } = require("../middleware/authMiddleware");
+const roomServiceController = require('../controllers/roomServiceController');
+const { auth, authorize } = require('../middleware/auth');
 
-// Create new room service order
-router.post("/order", authMiddleware(["admin", "staff"], ["reception"]), roomServiceController.createOrder);
+// Create room service order (All roles)
+router.post('/create', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), roomServiceController.createOrder);
 
-// Get all orders with filters
-router.get("/orders", authMiddleware(["admin", "staff"], ["reception"]), roomServiceController.getAllOrders);
+// Get all orders (All roles)
+router.get('/all', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), roomServiceController.getAllOrders);
 
-// Get order by ID
-router.get("/order/:id", authMiddleware(["admin", "staff"], ["reception"]), roomServiceController.getOrderById);
+// Get order by ID (All roles)
+router.get('/:id', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), roomServiceController.getOrderById);
 
-// Update order status
-router.patch("/order/:id/status", authMiddleware(["admin", "staff"], ["reception"]), roomServiceController.updateOrderStatus);
+// Update entire order
+router.put('/:id', auth, authorize(['ADMIN','STAFF', 'FRONT DESK']),roomServiceController.updateOrder);
 
-// Generate KOT
-router.post("/order/:id/kot", authMiddleware(["admin", "staff"], ["reception"]), roomServiceController.generateKOT);
+// Update room service order (PATCH)
+router.patch('/:id', auth, authorize(['ADMIN','STAFF', 'FRONT DESK']),roomServiceController.updateOrder);
 
-// Generate Bill
-router.post("/order/:id/bill", authMiddleware(["admin", "staff"], ["reception"]), roomServiceController.generateBill);
+// Update order status (Staff, Front Desk)
+router.patch('/:id/status', auth, authorize(['ADMIN','STAFF', 'FRONT DESK']), roomServiceController.updateOrderStatus);
 
-// Bill lookup
-router.get("/bill-lookup", authMiddleware(["admin", "staff"], ["reception"]), roomServiceController.billLookup);
+// Update payment status (Accounts, Admin)
+router.patch('/:id/payment', auth, authorize(['ACCOUNTS', 'ADMIN',  'FRONT DESK']), roomServiceController.updatePaymentStatus);
 
-// Get room service charges for checkout
-router.get("/room-charges", authMiddleware(["admin", "staff"], ["reception"]), roomServiceController.getRoomServiceCharges);
+// Update NC status (Admin, Front Desk)
+router.patch('/:id/nc', auth, authorize(['ADMIN', 'FRONT DESK']), roomServiceController.updateNCStatus);
 
-// Mark room service orders as paid
-router.post("/mark-paid", authMiddleware(["admin", "staff"], ["reception"]), roomServiceController.markOrdersPaid);
+// Generate KOT (Staff, Front Desk)
+router.post('/:id/kot', auth, authorize(['ADMIN', 'STAFF', 'FRONT DESK']), roomServiceController.generateKOT);
 
-// Update payment status
-router.patch("/order/:id/payment", authMiddleware(["admin", "staff"], ["reception"]), roomServiceController.updatePaymentStatus);
+// Generate Bill (Accounts, Admin, Front Desk)
+router.post('/:id/bill', auth, authorize(['ACCOUNTS', 'ADMIN', 'FRONT DESK']), roomServiceController.generateBill);
+
+// Bill lookup (Accounts, Admin, Front Desk)
+router.get('/lookup/bills', auth, authorize(['ACCOUNTS', 'ADMIN', 'FRONT DESK']), roomServiceController.billLookup);
+
+// Get room service charges for checkout (Front Desk, Accounts)
+router.get('/charges/checkout', auth, authorize(['FRONT DESK', 'ACCOUNTS', 'ADMIN']), roomServiceController.getRoomServiceCharges);
+
+// Mark orders as paid (Accounts, Admin)
+router.post('/mark-paid', auth, authorize(['ACCOUNTS', 'ADMIN',  'FRONT DESK']), roomServiceController.markOrdersPaid);
 
 // Delete order
-router.delete("/order/:id", authMiddleware(["admin", "staff"], ["reception"]), roomServiceController.deleteOrder);
+router.delete('/:id', auth, authorize(['ADMIN']), roomServiceController.deleteOrder);
 
 module.exports = router;

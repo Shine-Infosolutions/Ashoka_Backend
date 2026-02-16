@@ -1,43 +1,57 @@
 const mongoose = require('mongoose');
 
-const KOTSchema = new mongoose.Schema({
-  orderId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'RestaurantOrder',
-    required: true
-  },
+const kotSchema = new mongoose.Schema({
   kotNumber: {
     type: String,
     required: true,
     unique: true
   },
+  orderId: {
+    type: mongoose.Schema.Types.ObjectId,
+    required: true
+  }, 
+  orderType: {
+    type: String,
+    enum: ['restaurant', 'room-service'],
+    default: 'restaurant'
+  },
   tableNo: {
     type: String,
     required: true
   },
-  // Room service fields
-  guestName: String,
-  roomNumber: String,
   items: [{
-    itemId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Item',
+    itemName: {
+      type: String,
       required: true
     },
-    itemName: String,
-    quantity: { type: Number, required: true },
-    rate: { type: Number, default: 0 },
-    amount: { type: Number, default: 0 },
-    specialInstructions: String,
-    isFree: { type: Boolean, default: false },
-    nocId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'NOC'
+    quantity: {
+      type: Number,
+      required: true,
+      min: 1
+    },
+    specialInstructions: {
+      type: String,
+      default: ''
+    }
+  }],
+  itemStatuses: [{
+    itemIndex: {
+      type: Number,
+      required: true
+    },
+    status: {
+      type: String,
+      enum: ['pending', 'preparing', 'ready', 'served', 'delivered'],
+      default: 'pending'
+    },
+    updatedAt: {
+      type: Date,
+      default: Date.now
     }
   }],
   status: {
     type: String,
-    enum: ['pending', 'preparing', 'ready', 'served', 'completed', 'cancelled'],
+    enum: ['pending', 'preparing', 'ready', 'served'],
     default: 'pending'
   },
   priority: {
@@ -45,21 +59,22 @@ const KOTSchema = new mongoose.Schema({
     enum: ['low', 'normal', 'high', 'urgent'],
     default: 'normal'
   },
-  estimatedTime: Number, // in minutes
-  actualTime: Number, // in minutes
+  notes: {
+    type: String,
+    default: ''
+  },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
-  },
-  assignedChef: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  },
-  itemStatuses: [{
-    itemIndex: Number,
-    status: { type: String, enum: ['served', 'delivered'] },
-    updatedAt: { type: Date, default: Date.now }
-  }]
-}, { timestamps: true });
+  }
+}, {
+  timestamps: true
+});
 
-module.exports = mongoose.models.KOT || mongoose.model('KOT', KOTSchema);
+// Index for efficient queries
+kotSchema.index({ kotNumber: 1 });
+kotSchema.index({ orderId: 1 });
+kotSchema.index({ status: 1 });
+kotSchema.index({ createdAt: -1 });
+
+module.exports = mongoose.model('KOT', kotSchema);

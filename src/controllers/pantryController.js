@@ -1,11 +1,11 @@
 const PantryItem = require("../models/PantryItem");
 const PantryOrder = require("../models/PantryOrder");
+const Vendor = require("../models/Vendor");
 const ExcelJS = require('exceljs');
 
 // Auto-create vendor order for out-of-stock items
 exports.autoCreateVendorOrder = async (outOfStockItems, orderedBy) => {
   try {
-    const Vendor = require('../models/Vendor');
     
     // Find the best vendor based on past performance
     const vendors = await Vendor.find({ isActive: true });
@@ -1258,7 +1258,6 @@ exports.getVendorAnalytics = async (req, res) => {
 // Get suggested vendors for auto-ordering
 exports.getSuggestedVendors = async (req, res) => {
   try {
-    const Vendor = require('../models/Vendor');
     
     // Get all active vendors
     const vendors = await Vendor.find({ isActive: true }).sort({ name: 1 });

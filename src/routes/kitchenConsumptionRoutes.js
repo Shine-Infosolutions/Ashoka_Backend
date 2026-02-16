@@ -6,10 +6,11 @@ const {
   getConsumptionById,
   deleteConsumption
 } = require('../controllers/kitchenConsumptionController');
-const { authMiddleware } = require('../middleware/authMiddleware');
+const { auth, authorize } = require('../middleware/auth');
 
 // All routes require authentication
-router.use(authMiddleware(['admin', 'staff', 'restaurant', 'chef']));
+router.use(auth);
+router.use(authorize('ADMIN', 'GM', 'STAFF'));
 
 // Routes
 router.post('/', createConsumption);

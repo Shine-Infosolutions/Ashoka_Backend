@@ -1,79 +1,128 @@
 const RoomService = require("../models/RoomService");
+const { createAuditLog } = require('../utils/auditLogger');
+let RestaurantOrder;
+try {
+  RestaurantOrder = require("../models/RestaurantOrder");
+} catch (error) {
+  console.warn('RestaurantOrder model not found, room service will work with RoomService model only');
+}
 
-// Create room service order
+
+
+// Create room service order (integrates with restaurant orders)
 exports.createOrder = async (req, res) => {
   try {
-    const { serviceType, roomNumber, guestName, grcNo, bookingId, items, notes } = req.body;
+    const { serviceType, roomNumber, guestName, bookingNo, bookingId, items, notes } = req.body;
     
-    if (!serviceType || !roomNumber || !guestName || !items || items.length === 0) {
-      return res.status(400).json({ message: "Missing required fields" });
+    if (!roomNumber || !serviceType || !items || items.length === 0) {
+      return res.status(400).json({ message: "Missing required fields: roomNumber, serviceType, and items are required" });
     }
 
-    // Generate order number
     const orderCount = await RoomService.countDocuments();
     const orderNumber = `RS${Date.now().toString().slice(-6)}${(orderCount + 1).toString().padStart(3, '0')}`;
 
-    // Calculate totals
     let subtotal = 0;
     const processedItems = items.map(item => {
       const totalPrice = item.quantity * item.unitPrice;
       subtotal += totalPrice;
-      return { ...item, totalPrice };
+      return {
+        itemName: item.itemName,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        totalPrice,
+        category: item.category || 'Restaurant',
+        specialInstructions: item.specialInstructions || ''
+      };
     });
 
-    const tax = subtotal * 0.18; // 18% GST
-    const serviceCharge = subtotal * 0.10; // 10% service charge
-    const totalAmount = subtotal + tax + serviceCharge;
+    const totalAmount = subtotal;
 
-    const order = new RoomService({
+    const orderData = {
       orderNumber,
       serviceType,
       roomNumber,
-      guestName,
-      grcNo,
-      bookingId,
+      guestName: guestName || 'Guest',
       items: processedItems,
       subtotal,
-      tax,
-      serviceCharge,
+      tax: 0,
+      serviceCharge: 0,
       totalAmount,
-      createdBy: req.user.id,
-      notes
-    });
+      kotGenerated: true,
+      kotNumber: `KOT-${Date.now()}`,
+      kotGeneratedAt: new Date(),
+      notes: notes || ''
+    };
+    
+    if (bookingNo) orderData.bookingNo = bookingNo;
+    if (bookingId) orderData.bookingId = bookingId;
+    
+    const order = new RoomService(orderData);
 
     await order.save();
-    res.status(201).json({ success: true, order });
+
+    // Create audit log
+    createAuditLog('CREATE', 'ROOM_SERVICE', order._id, req.user?.id, req.user?.role, null, order.toObject(), req);
+
+    res.status(201).json({ success: true, message: 'Room service order created successfully', order });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// Get all orders
+// Get all orders (combines restaurant and room service orders)
 exports.getAllOrders = async (req, res) => {
   try {
-    const { status, roomNumber, serviceType, page = 1, limit = 20 } = req.query;
+    const { status, bookingId, serviceType, bookingNo, page = 1, limit = 20 } = req.query;
     
-    let filter = {};
-    if (status) filter.status = status;
-    if (roomNumber) filter.roomNumber = roomNumber;
-    if (serviceType) filter.serviceType = serviceType;
+    // Get restaurant orders (room service)
+    let restaurantOrders = [];
+    if (RestaurantOrder) {
+      let restaurantFilter = {
+        tableNo: { $regex: '^R' }
+      };
+      if (status) restaurantFilter.status = status;
+      
+      restaurantOrders = await RestaurantOrder.find(restaurantFilter).sort({ createdAt: -1 });
+    }
+    
+    // Get room service orders (non-restaurant)
+    let roomServiceFilter = {};
+    if (status) roomServiceFilter.status = status;
+    if (bookingId) roomServiceFilter.bookingId = bookingId;
+    if (serviceType && serviceType !== 'Restaurant') roomServiceFilter.serviceType = serviceType;
+    if (bookingNo) roomServiceFilter.bookingNo = bookingNo;
 
-    const orders = await RoomService.find(filter)
+    const roomServiceOrders = await RoomService.find(roomServiceFilter)
       .populate("createdBy", "username")
-      .populate("bookingId", "name grcNo")
-      .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
+      .populate("bookingId", "name")
+      .sort({ createdAt: -1 });
 
-    const total = await RoomService.countDocuments(filter);
+    // Combine and format orders
+    const allOrders = [
+      ...restaurantOrders.map(order => ({
+        ...order.toObject(),
+        serviceType: 'Restaurant',
+        orderNumber: order._id.toString().slice(-6),
+        totalAmount: Math.round(order.amount * 1.28)
+      })),
+      ...roomServiceOrders.map(order => order.toObject())
+    ];
+
+    // Sort by creation date
+    allOrders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    // Pagination
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + parseInt(limit);
+    const paginatedOrders = allOrders.slice(startIndex, endIndex);
 
     res.json({
       success: true,
-      orders,
+      orders: paginatedOrders,
       pagination: {
-        currentPage: page,
-        totalPages: Math.ceil(total / limit),
-        totalOrders: total
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(allOrders.length / limit),
+        totalOrders: allOrders.length
       }
     });
   } catch (error) {
@@ -84,15 +133,72 @@ exports.getAllOrders = async (req, res) => {
 // Get order by ID
 exports.getOrderById = async (req, res) => {
   try {
-    const order = await RoomService.findById(req.params.id)
+    let order = await RoomService.findById(req.params.id)
       .populate("createdBy", "username")
-      .populate("bookingId", "name grcNo phoneNumber");
+      .populate("bookingId", "name phoneNumber");
+
+    if (!order && RestaurantOrder) {
+      order = await RestaurantOrder.findById(req.params.id);
+      if (order) {
+        order = {
+          ...order.toObject(),
+          serviceType: 'Restaurant',
+          orderNumber: order._id.toString().slice(-6),
+          totalAmount: Math.round(order.amount * 1.28)
+        };
+      }
+    }
 
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
 
     res.json({ success: true, order });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Update entire order
+exports.updateOrder = async (req, res) => {
+  try {
+    const order = await RoomService.findById(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    if (order.status === 'delivered' || order.status === 'cancelled') {
+      return res.status(400).json({ message: "Cannot edit delivered or cancelled orders" });
+    }
+
+    const originalData = order.toObject();
+
+    // If items are being updated, recalculate totals
+    if (req.body.items) {
+      let subtotal = 0;
+      req.body.items.forEach(item => {
+        // Only add to subtotal if item is not marked as NC
+        const isNC = item.nonChargeable || item.isFree || item.nc;
+        if (!isNC) {
+          subtotal += item.quantity * item.unitPrice;
+        }
+      });
+      req.body.subtotal = subtotal;
+      req.body.totalAmount = subtotal;
+    }
+
+    // For PATCH requests, only update provided fields
+    const updatedOrder = await RoomService.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true, runValidators: false }
+    );
+    
+    // Create audit log
+    createAuditLog('UPDATE', 'ROOM_SERVICE', updatedOrder._id, req.user?.id, req.user?.role, originalData, updatedOrder.toObject(), req);
+    
+    res.json({ success: true, order: updatedOrder });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -102,18 +208,86 @@ exports.getOrderById = async (req, res) => {
 exports.updateOrderStatus = async (req, res) => {
   try {
     const { status } = req.body;
-    const order = await RoomService.findById(req.params.id);
+    let order = await RoomService.findById(req.params.id);
+
+    if (!order && RestaurantOrder) {
+      order = await RestaurantOrder.findById(req.params.id);
+      if (order) {
+        const originalData = order.toObject();
+        order.status = status;
+        if (status === "delivered" || status === "served") {
+          order.deliveryTime = new Date();
+        }
+        await order.save();
+        
+        // Create audit log for restaurant order
+        createAuditLog('UPDATE', 'RESTAURANT_ORDER', order._id, req.user?.id, req.user?.role, originalData, order.toObject(), req);
+        
+        return res.json({ success: true, order });
+      }
+    }
 
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
 
+    const originalData = order.toObject();
     order.status = status;
     if (status === "delivered") {
       order.deliveryTime = new Date();
     }
 
     await order.save();
+    
+    // Create audit log
+    createAuditLog('UPDATE', 'ROOM_SERVICE', order._id, req.user?.id, req.user?.role, originalData, order.toObject(), req);
+    
+    res.json({ success: true, order });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Update NC status for room service items
+exports.updateNCStatus = async (req, res) => {
+  try {
+    const { nonChargeable, itemIndex } = req.body;
+    const order = await RoomService.findById(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    const originalData = order.toObject();
+
+    if (itemIndex !== undefined) {
+      // Update item-level NC status
+      if (itemIndex >= 0 && itemIndex < order.items.length) {
+        order.items[itemIndex].nonChargeable = nonChargeable;
+        order.items[itemIndex].isFree = nonChargeable;
+        order.items[itemIndex].nc = nonChargeable;
+        
+        // Recalculate totals
+        let subtotal = 0;
+        order.items.forEach(item => {
+          const isNC = item.nonChargeable || item.isFree || item.nc;
+          if (!isNC) {
+            subtotal += item.quantity * item.unitPrice;
+          }
+        });
+        order.subtotal = subtotal;
+        order.totalAmount = subtotal;
+      }
+    } else {
+      // Update order-level NC status
+      order.nonChargeable = nonChargeable;
+    }
+
+    await order.save();
+    
+    // Create audit log
+    createAuditLog('UPDATE', 'ROOM_SERVICE', order._id, req.user?.id, req.user?.role, originalData, order.toObject(), req);
+    
     res.json({ success: true, order });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -123,7 +297,13 @@ exports.updateOrderStatus = async (req, res) => {
 // Generate KOT
 exports.generateKOT = async (req, res) => {
   try {
-    const order = await RoomService.findById(req.params.id);
+    let order = await RoomService.findById(req.params.id);
+    let isRestaurantOrder = false;
+
+    if (!order && RestaurantOrder) {
+      order = await RestaurantOrder.findById(req.params.id);
+      isRestaurantOrder = true;
+    }
 
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
@@ -132,6 +312,8 @@ exports.generateKOT = async (req, res) => {
     if (order.kotGenerated) {
       return res.status(400).json({ message: "KOT already generated" });
     }
+
+    const originalData = order.toObject();
 
     // Generate 4-digit KOT number
     const KOT = require('../models/KOT');
@@ -144,12 +326,18 @@ exports.generateKOT = async (req, res) => {
     });
     const nextNumber = (count % 9999) + 1;
     const kotNumber = String(nextNumber).padStart(4, '0');
+    
     order.kotGenerated = true;
     order.kotNumber = kotNumber;
     order.kotGeneratedAt = new Date();
     order.status = "confirmed";
 
     await order.save();
+    
+    // Create audit log
+    const module = isRestaurantOrder ? 'RESTAURANT_ORDER' : 'ROOM_SERVICE';
+    createAuditLog('UPDATE', module, order._id, req.user?.id, req.user?.role, originalData, order.toObject(), req);
+    
     res.json({ success: true, order, kotNumber });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -159,7 +347,13 @@ exports.generateKOT = async (req, res) => {
 // Generate Bill
 exports.generateBill = async (req, res) => {
   try {
-    const order = await RoomService.findById(req.params.id);
+    let order = await RoomService.findById(req.params.id);
+    let isRestaurantOrder = false;
+
+    if (!order && RestaurantOrder) {
+      order = await RestaurantOrder.findById(req.params.id);
+      isRestaurantOrder = true;
+    }
 
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
@@ -169,54 +363,55 @@ exports.generateBill = async (req, res) => {
       return res.status(400).json({ message: "Bill already generated" });
     }
 
+    const originalData = order.toObject();
     const billNumber = `BILL${Date.now().toString().slice(-8)}`;
     order.billGenerated = true;
     order.billNumber = billNumber;
     order.billGeneratedAt = new Date();
 
     await order.save();
+    
+    // Create audit log
+    const module = isRestaurantOrder ? 'RESTAURANT_ORDER' : 'ROOM_SERVICE';
+    createAuditLog('UPDATE', module, order._id, req.user?.id, req.user?.role, originalData, order.toObject(), req);
+    
     res.json({ success: true, order, billNumber });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// Bill lookup
+// Bill lookup (searches both restaurant and room service orders)
 exports.billLookup = async (req, res) => {
   try {
-    const { billNumber, orderNumber, roomNumber, grcNo } = req.query;
+    const { billNumber, orderNumber, bookingId, bookingNo } = req.query;
 
-    let filter = {};
-    if (billNumber) filter.billNumber = billNumber;
-    if (orderNumber) filter.orderNumber = orderNumber;
-    if (roomNumber) filter.roomNumber = roomNumber;
-    if (grcNo) filter.grcNo = grcNo;
+    let orders = [];
 
-    const orders = await RoomService.find(filter)
-      .populate("createdBy", "username")
-      .populate("bookingId", "name grcNo phoneNumber")
-      .sort({ createdAt: -1 });
+    // Search room service orders
+    let roomServiceFilter = {};
+    if (billNumber) roomServiceFilter.billNumber = billNumber;
+    if (orderNumber) roomServiceFilter.orderNumber = orderNumber;
+    if (bookingId) roomServiceFilter.bookingId = bookingId;
+    if (bookingNo) roomServiceFilter.bookingNo = bookingNo;
 
-    res.json({ success: true, orders });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// Update payment status
-exports.updatePaymentStatus = async (req, res) => {
-  try {
-    const { paymentStatus } = req.body;
-    const order = await RoomService.findById(req.params.id);
-
-    if (!order) {
-      return res.status(404).json({ message: "Order not found" });
+    if (Object.keys(roomServiceFilter).length > 0) {
+      const roomServiceOrders = await RoomService.find(roomServiceFilter)
+        .populate("createdBy", "username")
+        .populate("bookingId", "name phoneNumber")
+        .sort({ createdAt: -1 });
+      
+      orders.push(...roomServiceOrders.map(order => order.toObject()));
     }
 
-    order.paymentStatus = paymentStatus;
-    await order.save();
+    // Remove duplicates and sort
+    const uniqueOrders = orders.filter((order, index, self) => 
+      index === self.findIndex(o => o._id.toString() === order._id.toString())
+    );
+    
+    uniqueOrders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-    res.json({ success: true, order });
+    res.json({ success: true, orders: uniqueOrders });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -231,17 +426,31 @@ exports.getRoomServiceCharges = async (req, res) => {
       return res.status(400).json({ message: "Booking ID is required" });
     }
 
-    const filter = {
-      bookingId: bookingId,
-      status: "delivered",
-      paymentStatus: "unpaid"
+    let orders = [];
+    let totalCharges = 0;
+
+    // Get room service orders
+    let roomServiceFilter = {
+      paymentStatus: { $ne: 'paid' },
+      bookingId: bookingId
     };
 
-    const orders = await RoomService.find(filter)
-      .select('orderNumber serviceType totalAmount items createdAt')
+    const roomServiceOrders = await RoomService.find(roomServiceFilter)
+      .select('orderNumber serviceType totalAmount items createdAt roomNumber guestName')
       .sort({ createdAt: -1 });
 
-    const totalCharges = orders.reduce((sum, order) => sum + order.totalAmount, 0);
+    orders = roomServiceOrders.map(order => ({
+      orderNumber: order.orderNumber,
+      serviceType: order.serviceType || 'Room Service',
+      totalAmount: order.totalAmount,
+      items: order.items,
+      createdAt: order.createdAt,
+      roomNumber: order.roomNumber,
+      guestName: order.guestName,
+      _id: order._id
+    }));
+
+    totalCharges = orders.reduce((sum, order) => sum + order.totalAmount, 0);
 
     res.json({
       success: true,
@@ -254,7 +463,7 @@ exports.getRoomServiceCharges = async (req, res) => {
   }
 };
 
-// Mark room service orders as paid
+// Mark room service orders as paid (includes both restaurant and room service)
 exports.markOrdersPaid = async (req, res) => {
   try {
     const { bookingId } = req.body;
@@ -263,13 +472,29 @@ exports.markOrdersPaid = async (req, res) => {
       return res.status(400).json({ message: "Booking ID is required" });
     }
 
-    const filter = {
-      bookingId: bookingId,
+    // Mark restaurant orders as paid
+    if (RestaurantOrder) {
+      let restaurantFilter = {
+        tableNo: { $regex: '^R' },
+        status: { $in: ['served', 'delivered'] },
+        paymentStatus: { $ne: 'paid' },
+        bookingId: bookingId
+      };
+
+      await RestaurantOrder.updateMany(restaurantFilter, {
+        paymentStatus: 'paid',
+        status: 'paid'
+      });
+    }
+
+    // Mark room service orders as paid
+    let roomServiceFilter = {
       status: "delivered",
-      paymentStatus: "unpaid"
+      paymentStatus: "unpaid",
+      bookingId: bookingId
     };
 
-    await RoomService.updateMany(filter, {
+    await RoomService.updateMany(roomServiceFilter, {
       paymentStatus: "paid"
     });
 
@@ -279,20 +504,60 @@ exports.markOrdersPaid = async (req, res) => {
   }
 };
 
-// Delete order
-exports.deleteOrder = async (req, res) => {
+// Update payment status
+exports.updatePaymentStatus = async (req, res) => {
   try {
-    const order = await RoomService.findById(req.params.id);
+    const { paymentStatus } = req.body;
+    let order = await RoomService.findById(req.params.id);
+    let isRestaurantOrder = false;
+
+    if (!order && RestaurantOrder) {
+      order = await RestaurantOrder.findById(req.params.id);
+      isRestaurantOrder = true;
+    }
 
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    if (order.status !== "pending") {
-      return res.status(400).json({ message: "Cannot delete confirmed orders" });
+    const originalData = order.toObject();
+    order.paymentStatus = paymentStatus;
+    await order.save();
+
+    // Create audit log
+    const module = isRestaurantOrder ? 'RESTAURANT_ORDER' : 'ROOM_SERVICE';
+    createAuditLog('UPDATE', module, order._id, req.user?.id, req.user?.role, originalData, order.toObject(), req);
+
+    res.json({ success: true, order });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Delete order
+exports.deleteOrder = async (req, res) => {
+  try {
+    let order = await RoomService.findById(req.params.id);
+    let isRestaurantOrder = false;
+
+    if (!order && RestaurantOrder) {
+      order = await RestaurantOrder.findById(req.params.id);
+      isRestaurantOrder = true;
     }
 
-    await RoomService.findByIdAndDelete(req.params.id);
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    // Create audit log
+    createAuditLog('DELETE', 'ROOM_SERVICE', order._id, req.user?.id, req.user?.role, order.toObject(), null, req);
+
+    if (isRestaurantOrder) {
+      await RestaurantOrder.findByIdAndDelete(req.params.id);
+    } else {
+      await RoomService.findByIdAndDelete(req.params.id);
+    }
+    
     res.json({ success: true, message: "Order deleted successfully" });
   } catch (error) {
     res.status(500).json({ message: error.message });
