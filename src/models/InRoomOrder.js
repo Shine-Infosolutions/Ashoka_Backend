@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const restaurantOrderSchema = new mongoose.Schema({
+const inRoomOrderSchema = new mongoose.Schema({
   staffName: {
     type: String,
     required: false,
@@ -39,10 +39,6 @@ const restaurantOrderSchema = new mongoose.Schema({
     isFree: {
       type: Boolean,
       default: false
-    },
-    nocId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'NOC'
     }
   }],
   notes: {
@@ -141,14 +137,28 @@ const restaurantOrderSchema = new mongoose.Schema({
   },
   deliveryTime: {
     type: Date
+  },
+  bookingId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Booking'
+  },
+  grcNo: {
+    type: String
+  },
+  roomNumber: {
+    type: String
+  },
+  guestName: {
+    type: String
+  },
+  guestPhone: {
+    type: String
   }
 }, {
   timestamps: true
 });
 
-// Pre-save middleware to calculate GST amounts
-restaurantOrderSchema.pre('save', function(next) {
-  // Calculate subtotal excluding free items
+inRoomOrderSchema.pre('save', function(next) {
   const paidItemsSubtotal = this.items.reduce((sum, item) => {
     return sum + (item.isFree ? 0 : (item.price * item.quantity));
   }, 0);
@@ -158,17 +168,15 @@ restaurantOrderSchema.pre('save', function(next) {
   this.cgstAmount = (this.subtotal * this.cgstRate) / 100;
   this.totalGstAmount = this.sgstAmount + this.cgstAmount;
   this.amount = this.subtotal + this.totalGstAmount - this.discount;
-  
-  // Set nonChargeable to true if all items are free
   this.nonChargeable = this.items.length > 0 && this.items.every(item => item.isFree);
   
   next();
 });
 
-// Index for efficient queries
-restaurantOrderSchema.index({ tableNo: 1 });
-restaurantOrderSchema.index({ status: 1 });
-restaurantOrderSchema.index({ paymentStatus: 1 });
-restaurantOrderSchema.index({ createdAt: -1 });
+inRoomOrderSchema.index({ tableNo: 1 });
+inRoomOrderSchema.index({ grcNo: 1 });
+inRoomOrderSchema.index({ status: 1 });
+inRoomOrderSchema.index({ paymentStatus: 1 });
+inRoomOrderSchema.index({ createdAt: -1 });
 
-module.exports = mongoose.model('RestaurantOrder', restaurantOrderSchema);
+module.exports = mongoose.model('InRoomOrder', inRoomOrderSchema);

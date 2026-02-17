@@ -43,6 +43,9 @@ const kitchenConsumptionRoutes = require("./src/routes/kitchenConsumptionRoutes.
 const pantryRoutes = require("./src/routes/pantryRoutes.js");
 const pantryCategoryRoutes = require("./src/routes/pantryCategoryRoutes.js");
 const unitRoutes = require("./src/routes/unitRoutes.js");
+const nocRoutes = require("./src/routes/nocRoutes.js");
+const billRoutes = require("./src/routes/billRoutes.js");
+const inRoomOrderRoutes = require("./src/routes/inRoomOrderRoutes.js");
 
 const { connectAuditDB } = require("./src/config/auditDatabase.js");
 const { optimizeDatabase } = require("./src/utils/dbOptimization.js");
@@ -181,6 +184,9 @@ app.use("/api/pantry", pantryRoutes);
 app.use("/api/pantry-categories", pantryCategoryRoutes);
 app.use("/api/units", unitRoutes);
 app.use("/api/vendor", vendorRoutes);
+app.use("/api/noc", nocRoutes);
+app.use("/api/bills", billRoutes);
+app.use("/api/inroom-orders", inRoomOrderRoutes);
 
 // Health check endpoint
 app.get("/health", async (req, res) => {

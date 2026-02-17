@@ -18,4 +18,19 @@ router.patch('/:id', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT
 // Link existing orders to bookings (Admin, GM)
 router.post('/link-to-bookings', auth, authorize(['ADMIN', 'GM', 'FRONT DESK']), restaurantOrderController.linkOrdersToBookings);
 
+// Get order details
+router.get('/details/:id', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), restaurantOrderController.getOrderDetails);
+
+// Transfer table
+router.patch('/:id/transfer-table', auth, authorize(['ADMIN', 'GM', 'STAFF', 'FRONT DESK']), restaurantOrderController.transferTable);
+
+// Add items to order
+router.patch('/:id/add-items', auth, authorize(['ADMIN', 'GM', 'STAFF', 'FRONT DESK']), restaurantOrderController.addItems);
+
+// Add transaction to order
+router.patch('/:id/add-transaction', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), restaurantOrderController.addTransaction);
+
+// Get invoice
+router.get('/invoice/:id', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), restaurantOrderController.getInvoice);
+
 module.exports = router;

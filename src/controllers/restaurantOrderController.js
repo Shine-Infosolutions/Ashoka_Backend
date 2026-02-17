@@ -1,4 +1,5 @@
 const RestaurantOrder = require('../models/RestaurantOrder.js');
+const MenuItem = require('../models/MenuItem.js');
 const { createAuditLog } = require('../utils/auditLogger');
 const mongoose = require('mongoose');
 
@@ -9,22 +10,31 @@ exports.createOrder = async (req, res) => {
   try {
     const orderData = req.body;
     
-    // Try to link order to booking if tableNo matches a room number
+    // Populate item details from MenuItem collection
+    const itemsWithDetails = await Promise.all(
+      orderData.items.map(async (item) => {
+        const menuItem = await MenuItem.findById(item.itemId);
+        if (!menuItem) throw new Error(`Menu item ${item.itemId} not found`);
+        return {
+          itemId: item.itemId,
+          itemName: menuItem.name,
+          quantity: item.quantity,
+          price: menuItem.Price || menuItem.price || 0,
+          isFree: item.isFree || false,
+          nocId: item.nocId || null
+        };
+      })
+    );
+    
+    orderData.items = itemsWithDetails;
+    
+    // Update table status to occupied
     if (orderData.tableNo) {
-      const Booking = require('../models/Booking');
-      const booking = await Booking.findOne({
-        roomNumber: { $regex: new RegExp(`(^|,)\\s*${orderData.tableNo}\\s*(,|$)`) },
-        status: { $in: ['Booked', 'Checked In'] },
-        isActive: true
-      });
-      
-      if (booking) {
-        orderData.bookingId = booking._id;
-        orderData.grcNo = booking.grcNo;
-        orderData.roomNumber = booking.roomNumber;
-        orderData.guestName = booking.name;
-        orderData.guestPhone = booking.mobileNo;
-      }
+      const RestaurantTable = require('../models/RestaurantTable');
+      await RestaurantTable.findOneAndUpdate(
+        { tableNumber: orderData.tableNo },
+        { status: 'occupied' }
+      );
     }
     
     const order = new RestaurantOrder(orderData);
@@ -45,7 +55,6 @@ exports.getAllOrders = async (req, res) => {
     const orders = await RestaurantOrder.find()
       .sort({ createdAt: -1 })
       .populate('items.itemId', 'name price')
-      .populate('bookingId', 'grcNo roomNumber guestName invoiceNumber')
       .maxTimeMS(5000)
       .lean()
       .exec();
@@ -179,6 +188,94 @@ exports.linkOrdersToBookings = async (req, res) => {
       linkedCount,
       totalUnlinked: unlinkedOrders.length
     });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.getOrderDetails = async (req, res) => {
+  try {
+    const order = await RestaurantOrder.findById(req.params.id)
+      .populate('items.itemId', 'name price Price')
+      .populate('items.nocId', 'name authorityType');
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    res.json(order);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.transferTable = async (req, res) => {
+  try {
+    const { newTableNo } = req.body;
+    const order = await RestaurantOrder.findByIdAndUpdate(
+      req.params.id,
+      { tableNo: newTableNo },
+      { new: true }
+    );
+    res.json(order);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.addItems = async (req, res) => {
+  try {
+    const { items } = req.body;
+    const order = await RestaurantOrder.findById(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    
+    const MenuItem = require('../models/MenuItem');
+    const newItems = await Promise.all(
+      items.map(async (item) => {
+        const menuItem = await MenuItem.findById(item.itemId);
+        return {
+          itemId: item.itemId,
+          itemName: menuItem.name,
+          quantity: item.quantity,
+          price: menuItem.Price || menuItem.price || 0,
+          isFree: false
+        };
+      })
+    );
+    
+    order.items.push(...newItems);
+    await order.save();
+    res.json(order);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.addTransaction = async (req, res) => {
+  try {
+    const order = await RestaurantOrder.findByIdAndUpdate(
+      req.params.id,
+      { paymentStatus: 'paid', status: 'paid' },
+      { new: true }
+    );
+    
+    // Update table status to available when order is paid
+    if (order && order.tableNo) {
+      const RestaurantTable = require('../models/RestaurantTable');
+      await RestaurantTable.findOneAndUpdate(
+        { tableNumber: order.tableNo },
+        { status: 'available' }
+      );
+    }
+    
+    res.json(order);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.getInvoice = async (req, res) => {
+  try {
+    const order = await RestaurantOrder.findById(req.params.id)
+      .populate('items.itemId', 'name price Price');
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    res.json({ order });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

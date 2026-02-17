@@ -26,21 +26,21 @@ exports.createCheckout = async (req, res) => {
     let roomServiceCharges = 0;
     
     try {
-      const RestaurantOrder = require('../models/RestaurantOrder');
+      const InRoomOrder = require('../models/InRoomOrder');
       const RoomService = require('../models/RoomService');
       
       // Split room numbers and check each one
       const roomNumbers = booking.roomNumber ? booking.roomNumber.split(',').map(r => r.trim()) : [];
       
-      // Get restaurant orders for this booking (exclude cancelled, completed, and non-chargeable orders)
-      const restaurantOrders = await RestaurantOrder.find({
+      // Get in-room dining orders for this booking (exclude cancelled, completed, and non-chargeable orders)
+      const inRoomOrders = await InRoomOrder.find({
         bookingId: bookingId,
         paymentStatus: { $ne: 'paid' },
         status: { $nin: ['cancelled', 'canceled', 'completed'] },
         nonChargeable: { $ne: true }
       });
       
-      restaurantCharges = restaurantOrders.reduce((total, order) => {
+      restaurantCharges = inRoomOrders.reduce((total, order) => {
         return total + (order.amount || 0);
       }, 0);
       
@@ -116,10 +116,10 @@ exports.getCheckout = async (req, res) => {
     const roomNumbers = booking.roomNumber ? booking.roomNumber.split(',').map(r => r.trim()) : [];
     
     try {
-      const RestaurantOrder = require('../models/RestaurantOrder');
+      const InRoomOrder = require('../models/InRoomOrder');
       const RoomService = require('../models/RoomService');
       
-      const restaurantOrders = await RestaurantOrder.find({
+      const inRoomOrders = await InRoomOrder.find({
         $or: [
           { tableNo: { $in: roomNumbers } },
           { bookingId: bookingId }
@@ -136,7 +136,7 @@ exports.getCheckout = async (req, res) => {
         nonChargeable: { $ne: true }
       });
       
-      const restaurantCharges = restaurantOrders.reduce((total, order) => total + (order.amount || 0), 0);
+      const restaurantCharges = inRoomOrders.reduce((total, order) => total + (order.amount || 0), 0);
       const roomServiceCharges = roomServiceOrders.reduce((total, order) => total + (order.totalAmount || 0), 0);
       
       // Update checkout if charges have changed
@@ -176,8 +176,8 @@ exports.getComprehensiveCheckout = async (req, res) => {
     let checkout = await Checkout.findOne({ bookingId });
     
     // Get all charges in parallel
-    const [restaurantOrders, roomServiceOrders, laundryOrders] = await Promise.all([
-      require('../models/RestaurantOrder').find({
+    const [inRoomOrders, roomServiceOrders, laundryOrders] = await Promise.all([
+      require('../models/InRoomOrder').find({
         bookingId: bookingId,
         paymentStatus: { $ne: 'paid' },
         status: { $nin: ['cancelled', 'canceled'] },
@@ -196,7 +196,7 @@ exports.getComprehensiveCheckout = async (req, res) => {
     ]);
 
     // Calculate charges
-    const restaurantCharges = restaurantOrders.reduce((sum, order) => sum + (order.amount || 0), 0);
+    const restaurantCharges = inRoomOrders.reduce((sum, order) => sum + (order.amount || 0), 0);
     const roomServiceCharges = roomServiceOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
     const laundryCharges = laundryOrders.reduce((sum, order) => {
       const chargeableAmount = order.items?.filter(item => !item.nonChargeable && item.status !== 'lost')
@@ -342,9 +342,9 @@ exports.updatePaymentStatus = async (req, res) => {
             }
           );
           
-          // Also update restaurant orders
-          const RestaurantOrder = require('../models/RestaurantOrder');
-          await RestaurantOrder.updateMany(
+          // Also update in-room dining orders
+          const InRoomOrder = require('../models/InRoomOrder');
+          await InRoomOrder.updateMany(
             {
               tableNo: { $in: roomNumbers },
               paymentStatus: { $ne: 'paid' },
@@ -446,7 +446,7 @@ exports.getInvoice = async (req, res) => {
     }
     // Always recalculate room service charges to get latest orders
     try {
-      const RestaurantOrder = require('../models/RestaurantOrder');
+      const InRoomOrder = require('../models/InRoomOrder');
       const RoomService = require('../models/RoomService');
       const booking = checkout.bookingId;
       
@@ -454,7 +454,7 @@ exports.getInvoice = async (req, res) => {
       const roomNumbers = booking.roomNumber ? booking.roomNumber.split(',').map(r => r.trim()) : [];
       
       // Get orders for this specific booking only (exclude non-chargeable)
-      const restaurantOrders = await RestaurantOrder.find({
+      const inRoomOrders = await InRoomOrder.find({
         bookingId: booking._id,
         status: { $nin: ['cancelled', 'canceled'] },
         nonChargeable: { $ne: true }
@@ -467,7 +467,7 @@ exports.getInvoice = async (req, res) => {
         nonChargeable: { $ne: true }
       });
       
-      const restaurantCharges = restaurantOrders.reduce((total, order) => {
+      const restaurantCharges = inRoomOrders.reduce((total, order) => {
         return total + (order.amount || 0);
       }, 0);
       
