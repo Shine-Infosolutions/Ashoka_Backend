@@ -27,6 +27,13 @@ const vendorSchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
+  UpiID: {
+    type: String,
+    trim: true,
+  },
+  scannerImg: {
+    type: String,
+  },
   isActive: {
     type: Boolean,
     default: true

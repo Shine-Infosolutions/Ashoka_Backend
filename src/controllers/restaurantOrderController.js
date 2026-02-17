@@ -207,12 +207,34 @@ exports.getOrderDetails = async (req, res) => {
 
 exports.transferTable = async (req, res) => {
   try {
-    const { newTableNo } = req.body;
-    const order = await RestaurantOrder.findByIdAndUpdate(
-      req.params.id,
-      { tableNo: newTableNo },
-      { new: true }
+    const { newTableNo, oldTableStatus } = req.body;
+    const order = await RestaurantOrder.findById(req.params.id);
+    
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    
+    const RestaurantTable = require('../models/RestaurantTable');
+    const oldTableNo = order.tableNo;
+    
+    // Update old table status
+    if (oldTableNo) {
+      await RestaurantTable.findOneAndUpdate(
+        { tableNumber: oldTableNo },
+        { status: oldTableStatus || 'available' }
+      );
+    }
+    
+    // Update new table to occupied
+    await RestaurantTable.findOneAndUpdate(
+      { tableNumber: newTableNo },
+      { status: 'occupied' }
     );
+    
+    // Update order with new table
+    order.tableNo = newTableNo;
+    await order.save();
+    
     res.json(order);
   } catch (error) {
     res.status(500).json({ error: error.message });

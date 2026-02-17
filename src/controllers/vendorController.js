@@ -1,10 +1,10 @@
-const LaundryVendor = require("../models/LaundryVendor");
+const Vendor = require("../models/Vendor");
 const cloudinary = require("../utils/cloudinary");
 
 // Get all vendors
 exports.getAllVendors = async (req, res) => {
   try {
-    const vendors = await LaundryVendor.find().sort({ vendorName: 1 });
+    const vendors = await Vendor.find().sort({ name: 1 });
     res.json({ success: true, vendors });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -14,7 +14,7 @@ exports.getAllVendors = async (req, res) => {
 // Get single vendor
 exports.getVendorById = async (req, res) => {
   try {
-    const vendor = await LaundryVendor.findById(req.params.id);
+    const vendor = await Vendor.findById(req.params.id);
     if (!vendor) {
       return res.status(404).json({ error: "Vendor not found" });
     }
@@ -27,35 +27,18 @@ exports.getVendorById = async (req, res) => {
 // Create vendor
 exports.createVendor = async (req, res) => {
   try {
-    const { vendorName, contactPerson, phoneNumber, email, address, gstNumber, UpiID, scannerImg, isActive, remarks } = req.body;
+    const { name, contactPerson, phone, email, address, gstNumber, UpiID, scannerImg, isActive } = req.body;
     
-    let uploadedImageUrl = null;
-    
-    // Handle base64 image upload
-    if (scannerImg && scannerImg.startsWith('data:image/')) {
-      try {
-        const uploadResult = await cloudinary.uploader.upload(scannerImg, {
-          folder: 'havan-booking-media',
-          public_id: `vendor-${Date.now()}`,
-          transformation: [{ width: 800, height: 800, crop: 'limit' }]
-        });
-        uploadedImageUrl = uploadResult.secure_url;
-      } catch (uploadError) {
-        return res.status(400).json({ error: 'Image upload failed' });
-      }
-    }
-    
-    const vendor = new LaundryVendor({
-      vendorName,
+    const vendor = new Vendor({
+      name,
       contactPerson,
-      phoneNumber,
+      phone,
       email,
       address,
       gstNumber,
       UpiID,
-      scannerImg: uploadedImageUrl,
-      isActive: isActive !== undefined ? isActive : true,
-      remarks
+      scannerImg,
+      isActive: isActive !== undefined ? isActive : true
     });
     
     await vendor.save();
@@ -68,35 +51,21 @@ exports.createVendor = async (req, res) => {
 // Update vendor
 exports.updateVendor = async (req, res) => {
   try {
-    const { vendorName, contactPerson, phoneNumber, email, address, gstNumber, UpiID, scannerImg, isActive, remarks } = req.body;
+    const { name, contactPerson, phone, email, address, gstNumber, UpiID, scannerImg, isActive } = req.body;
     
     const updateData = {
-      vendorName,
+      name,
       contactPerson,
-      phoneNumber,
+      phone,
       email,
       address,
       gstNumber,
       UpiID,
-      isActive,
-      remarks
+      scannerImg,
+      isActive
     };
     
-    // Handle base64 image upload
-    if (scannerImg && scannerImg.startsWith('data:image/')) {
-      try {
-        const uploadResult = await cloudinary.uploader.upload(scannerImg, {
-          folder: 'havan-booking-media',
-          public_id: `vendor-${Date.now()}`,
-          transformation: [{ width: 800, height: 800, crop: 'limit' }]
-        });
-        updateData.scannerImg = uploadResult.secure_url;
-      } catch (uploadError) {
-        return res.status(400).json({ error: 'Image upload failed' });
-      }
-    }
-    
-    const vendor = await LaundryVendor.findByIdAndUpdate(
+    const vendor = await Vendor.findByIdAndUpdate(
       req.params.id,
       updateData,
       { new: true }
@@ -113,7 +82,7 @@ exports.updateVendor = async (req, res) => {
 // Delete vendor
 exports.deleteVendor = async (req, res) => {
   try {
-    const vendor = await LaundryVendor.findByIdAndDelete(req.params.id);
+    const vendor = await Vendor.findByIdAndDelete(req.params.id);
     if (!vendor) {
       return res.status(404).json({ error: "Vendor not found" });
     }
@@ -126,7 +95,7 @@ exports.deleteVendor = async (req, res) => {
 // Get active vendors only
 exports.getActiveVendors = async (req, res) => {
   try {
-    const vendors = await LaundryVendor.find({ isActive: true }).sort({ vendorName: 1 });
+    const vendors = await Vendor.find({ isActive: true }).sort({ name: 1 });
     res.json({ success: true, vendors });
   } catch (error) {
     res.status(500).json({ error: error.message });
