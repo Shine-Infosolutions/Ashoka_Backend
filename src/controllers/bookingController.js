@@ -455,7 +455,7 @@ exports.getBookings = async (req, res) => {
           categoryId: { $ifNull: ['$categoryId', { name: 'Unknown' }] },
           createdAt: 1, days: 1, noOfAdults: 1, noOfChildren: 1,
           roomRates: 1, extraBed: 1, extraBedRooms: 1, roomGuestDetails: 1,
-          advancePayments: 1, discountPercent: 1, discountNotes: 1,
+          advancePayments: 1, paymentMode: 1, discountPercent: 1, discountNotes: 1,
           amendmentHistory: 1, extraBedCharge: 1
         }
       }
