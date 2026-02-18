@@ -4,7 +4,18 @@ const RestaurantOrder = require('../models/RestaurantOrder');
 exports.createBill = async (req, res) => {
   try {
     const { orderId, discount, tax, paymentMethod } = req.body;
-    const bill = new Bill({ orderId, discount, tax, paymentMethod });
+    
+    // Generate unique bill number
+    const count = await Bill.countDocuments();
+    const billNumber = `BILL${String(count + 1).padStart(6, '0')}`;
+    
+    const bill = new Bill({ 
+      billNumber,
+      orderId, 
+      discount, 
+      tax, 
+      paymentMethod 
+    });
     await bill.save();
     res.status(201).json(bill);
   } catch (error) {

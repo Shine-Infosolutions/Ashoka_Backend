@@ -1,6 +1,11 @@
 const mongoose = require('mongoose');
 
 const billSchema = new mongoose.Schema({
+  billNumber: {
+    type: String,
+    unique: true,
+    sparse: true
+  },
   orderId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'RestaurantOrder',
@@ -34,6 +39,14 @@ const billSchema = new mongoose.Schema({
   }]
 }, {
   timestamps: true
+});
+
+billSchema.pre('save', async function(next) {
+  if (!this.billNumber) {
+    const count = await mongoose.model('Bill').countDocuments();
+    this.billNumber = `BILL${String(count + 1).padStart(6, '0')}`;
+  }
+  next();
 });
 
 module.exports = mongoose.model('Bill', billSchema);
