@@ -75,10 +75,15 @@ laundrySchema.pre("save", async function (next) {
           const rateDoc = await mongoose.model("LaundryItem").findById(item.rateId);
           if (rateDoc) {
             if (!item.itemName) item.itemName = rateDoc.itemName;
-            item.calculatedAmount = rateDoc.rate * (item.quantity || 1);
+            // Only recalculate if calculatedAmount is not explicitly set to 0 (compensated items)
+            if (item.calculatedAmount === undefined || item.calculatedAmount === null || (item.calculatedAmount === 0 && !item.itemNotes?.includes('COMPENSATED'))) {
+              item.calculatedAmount = rateDoc.rate * (item.quantity || 1);
+            }
           }
         } catch (error) {
-          item.calculatedAmount = 0;
+          if (item.calculatedAmount === undefined || item.calculatedAmount === null) {
+            item.calculatedAmount = 0;
+          }
         }
       }
       total += item.calculatedAmount || 0;

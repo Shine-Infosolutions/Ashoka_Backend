@@ -558,40 +558,41 @@ exports.getLossReportById = async (req, res) => {
 exports.updateLossReportStatus = async (req, res) => {
   try {
     const { status } = req.body;
-    const report = await LaundryLoss.findByIdAndUpdate(
-      req.params.id,
-      { status },
-      { new: true, runValidators: true }
-    );
+    const report = await LaundryLoss.findById(req.params.id);
     if (!report) return res.status(404).json({ error: 'Loss report not found' });
     
-    // If status is resolved, update the laundry order items to remove 'lost' status
-    if (status === 'resolved' && report.orderId && report.lostItems.length > 0) {
-      const order = await Laundry.findById(report.orderId);
-      if (order) {
-        report.lostItems.forEach(lostItem => {
-          const item = order.items.id(lostItem.itemId);
-          if (item && item.status === 'lost') {
-            item.status = 'delivered';
-            item.damageReported = false;
-            item.itemNotes = item.itemNotes ? `${item.itemNotes} - RESOLVED` : 'RESOLVED';
-          }
-        });
-        await order.save();
-      }
-    }
+    const previousStatus = report.status;
+    report.status = status;
+    await report.save();
     
-    // If status is compensated, mark items as non-chargeable
-    if (status === 'compensated' && report.orderId && report.lostItems.length > 0) {
+    // Handle status transitions
+    if (report.orderId && report.lostItems.length > 0) {
       const order = await Laundry.findById(report.orderId);
       if (order) {
         report.lostItems.forEach(lostItem => {
           const item = order.items.id(lostItem.itemId);
           if (item) {
-            item.nonChargeable = true;
-            item.itemNotes = item.itemNotes ? `${item.itemNotes} - COMPENSATED` : 'COMPENSATED';
+            // Reset item based on new status
+            if (status === 'resolved') {
+              item.status = 'delivered';
+              item.damageReported = false;
+              item.calculatedAmount = lostItem.calculatedAmount;
+              item.itemNotes = 'RESOLVED';
+            } else if (status === 'compensated') {
+              item.calculatedAmount = 0;
+              item.status = 'cancelled';
+              item.itemNotes = 'COMPENSATED';
+            } else {
+              // For 'reported' or 'investigating' status
+              item.status = 'lost';
+              item.damageReported = true;
+              item.calculatedAmount = lostItem.calculatedAmount;
+              item.itemNotes = `LOST: ${report.lossNote}`;
+            }
           }
         });
+        
+        order.totalAmount = order.items.reduce((sum, item) => sum + (item.calculatedAmount || 0), 0);
         await order.save();
       }
     }
