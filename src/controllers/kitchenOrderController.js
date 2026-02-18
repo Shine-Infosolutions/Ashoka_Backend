@@ -114,6 +114,41 @@ const createKitchenOrder = async (req, res) => {
 // Update kitchen order
 const updateKitchenOrder = async (req, res) => {
   try {
+    // Validate stock before marking as delivered
+    if (req.body.status === 'delivered') {
+      const order = await KitchenOrder.findById(req.params.id).populate('items.itemId', 'name');
+      if (order && (order.orderType === 'kitchen_to_pantry' || order.orderType === 'pantry_to_kitchen')) {
+        const PantryItem = require('../models/PantryItem');
+        const outOfStockItems = [];
+        
+        for (const item of order.items) {
+          const itemName = item.itemId?.name || item.name;
+          const pantryItem = await PantryItem.findOne({ name: itemName });
+          
+          if (pantryItem && pantryItem.stockQuantity < Number(item.quantity)) {
+            outOfStockItems.push({
+              name: itemName,
+              requested: Number(item.quantity),
+              available: pantryItem.stockQuantity,
+              shortage: Number(item.quantity) - pantryItem.stockQuantity
+            });
+          }
+        }
+        
+        if (outOfStockItems.length > 0) {
+          const errorMessage = outOfStockItems.map(item => 
+            `${item.name}: Requested ${item.requested}, Available ${item.available} (Short by ${item.shortage})`
+          ).join('; ');
+          
+          return res.status(400).json({ 
+            error: 'Items are out of stock in pantry. Cannot mark as delivered.',
+            outOfStockItems,
+            message: errorMessage
+          });
+        }
+      }
+    }
+    
     // Set receivedAt timestamp when status is 'delivered'
     const updateData = { ...req.body };
     if (req.body.status === 'delivered') {
@@ -147,7 +182,7 @@ const updateKitchenOrder = async (req, res) => {
           }
           
           try {
-            // Reduce pantry stock (pantry sends items to kitchen)
+            // Check pantry stock first (pantry sends items to kitchen)
             const pantryItem = await PantryItem.findOne({ name: itemName }).populate('unit').populate('category');
             if (pantryItem) {
               if (pantryItem.stockQuantity >= itemQuantity) {
@@ -158,36 +193,36 @@ const updateKitchenOrder = async (req, res) => {
                   { $inc: { stockQuantity: -itemQuantity } }
                 );
                 console.log(`Reduced pantry stock: ${itemName} ${oldPantryStock} - ${itemQuantity} = ${oldPantryStock - itemQuantity}`);
+                
+                // Only add to kitchen store if pantry stock was sufficient
+                let kitchenItem = await KitchenStore.findOne({ 
+                  name: itemName 
+                });
+                
+                if (kitchenItem) {
+                  const oldQuantity = Number(kitchenItem.quantity);
+                  await KitchenStore.updateOne(
+                    { _id: kitchenItem._id },
+                    { $inc: { quantity: itemQuantity } }
+                  );
+                  console.log(`Updated kitchen store: ${itemName} ${oldQuantity} + ${itemQuantity} = ${oldQuantity + itemQuantity}`);
+                } else {
+                  // Get unit from pantry item or use default
+                  const unitName = pantryItem?.unit?.name || 'pcs';
+                  kitchenItem = new KitchenStore({
+                    name: itemName,
+                    category: 'Food',
+                    quantity: itemQuantity,
+                    unit: unitName
+                  });
+                  await kitchenItem.save();
+                  console.log(`Created new kitchen store item: ${itemName} with ${itemQuantity} ${unitName}`);
+                }
               } else {
-                console.log(`Warning: Insufficient pantry stock for ${itemName}. Available: ${pantryItem.stockQuantity}, Required: ${itemQuantity}`);
+                console.log(`Skipping item ${itemName} - Insufficient pantry stock. Available: ${pantryItem.stockQuantity}, Required: ${itemQuantity}`);
               }
             } else {
               console.log(`Warning: Pantry item not found: ${itemName}`);
-            }
-            
-            // Add to kitchen store
-            let kitchenItem = await KitchenStore.findOne({ 
-              name: itemName 
-            });
-            
-            if (kitchenItem) {
-              const oldQuantity = Number(kitchenItem.quantity);
-              await KitchenStore.updateOne(
-                { _id: kitchenItem._id },
-                { $inc: { quantity: itemQuantity } }
-              );
-              console.log(`Updated kitchen store: ${itemName} ${oldQuantity} + ${itemQuantity} = ${oldQuantity + itemQuantity}`);
-            } else {
-              // Get unit from pantry item or use default
-              const unitName = pantryItem?.unit?.name || 'pcs';
-              kitchenItem = new KitchenStore({
-                name: itemName,
-                category: 'Food',
-                quantity: itemQuantity,
-                unit: unitName
-              });
-              await kitchenItem.save();
-              console.log(`Created new kitchen store item: ${itemName} with ${itemQuantity} ${unitName}`);
             }
           } catch (itemError) {
             console.error(`Error processing item ${itemName}:`, itemError.message);
@@ -202,7 +237,7 @@ const updateKitchenOrder = async (req, res) => {
     }
 
     // Sync pantry order status when kitchen order status changes
-    if (order.orderType === 'pantry_to_kitchen' && order.pantryOrderId && req.body.status) {
+    if ((order.orderType === 'pantry_to_kitchen' || order.orderType === 'kitchen_to_pantry') && order.pantryOrderId && req.body.status) {
       try {
         const PantryOrder = require('../models/PantryOrder');
         let pantryStatus = req.body.status;

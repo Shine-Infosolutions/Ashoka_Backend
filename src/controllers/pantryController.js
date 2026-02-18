@@ -431,6 +431,43 @@ exports.getPantryOrders = async (req, res) => {
 // Update pantry order
 exports.updatePantryOrder = async (req, res) => {
   try {
+    // If status is being updated to approved for Kitchen to Pantry orders, validate stock
+    if (req.body.status === 'approved' || req.body.status === 'fulfilled') {
+      const existingOrder = await PantryOrder.findById(req.params.id);
+      
+      if (existingOrder && existingOrder.orderType === 'Kitchen to Pantry') {
+        const outOfStockItems = [];
+        
+        for (const item of existingOrder.items) {
+          const pantryItem = await PantryItem.findById(item.itemId);
+          if (!pantryItem) {
+            return res.status(404).json({ error: `Item not found: ${item.itemId}` });
+          }
+          
+          if (pantryItem.stockQuantity < item.quantity) {
+            outOfStockItems.push({
+              name: pantryItem.name,
+              requested: item.quantity,
+              available: pantryItem.stockQuantity,
+              shortage: item.quantity - pantryItem.stockQuantity
+            });
+          }
+        }
+        
+        if (outOfStockItems.length > 0) {
+          const errorMessage = outOfStockItems.map(item => 
+            `${item.name}: Requested ${item.requested}, Available ${item.available} (Short by ${item.shortage})`
+          ).join('; ');
+          
+          return res.status(400).json({ 
+            error: 'Items are out of stock. Please place an order to restock first.',
+            outOfStockItems,
+            message: errorMessage
+          });
+        }
+      }
+    }
+    
     // If status is being updated, handle stock updates first
     if (req.body.status) {
       const existingOrder = await PantryOrder.findById(req.params.id);
@@ -483,6 +520,37 @@ exports.updatePantryOrderStatus = async (req, res) => {
     if (order.orderType === 'Kitchen to Pantry' && (status === 'approved' || status === 'fulfilled')) {
       console.log('=== PROCESSING KITCHEN TO PANTRY APPROVAL ===');
       console.log('Order ID:', order._id);
+      
+      // Check stock availability before approval
+      const outOfStockItems = [];
+      for (const item of order.items) {
+        const pantryItem = await PantryItem.findById(item.itemId);
+        if (!pantryItem) {
+          return res.status(404).json({ error: `Item not found: ${item.itemId}` });
+        }
+        
+        if (pantryItem.stockQuantity < item.quantity) {
+          outOfStockItems.push({
+            name: pantryItem.name,
+            requested: item.quantity,
+            available: pantryItem.stockQuantity,
+            shortage: item.quantity - pantryItem.stockQuantity
+          });
+        }
+      }
+      
+      // If any items are out of stock, reject approval
+      if (outOfStockItems.length > 0) {
+        const errorMessage = outOfStockItems.map(item => 
+          `${item.name}: Requested ${item.requested}, Available ${item.available} (Short by ${item.shortage})`
+        ).join('; ');
+        
+        return res.status(400).json({ 
+          error: 'Items are out of stock. Please place an order to restock first.',
+          outOfStockItems,
+          message: errorMessage
+        });
+      }
       console.log('Order items:', JSON.stringify(order.items, null, 2));
       console.log('Existing kitchenOrderId:', order.kitchenOrderId);
       

@@ -62,7 +62,7 @@ const updateKitchenOrder = async (req, res) => {
     });
 
     // Sync pantry order status when kitchen order status changes
-    if (order.orderType === 'pantry_to_kitchen' && req.body.status) {
+    if ((order.orderType === 'pantry_to_kitchen' || order.orderType === 'kitchen_to_pantry') && req.body.status) {
       console.log(`Attempting to sync pantry order for kitchen order ${order._id}`);
       try {
         const PantryOrder = require('../models/PantryOrder');
