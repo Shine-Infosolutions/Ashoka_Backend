@@ -124,7 +124,9 @@ exports.updateLaundryOrder = async (req, res) => {
     const originalOrder = await Laundry.findById(req.params.id);
     if (!originalOrder) return res.status(404).json({ error: 'Order not found' });
     
-    const order = await Laundry.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    // Use save() instead of findByIdAndUpdate to trigger pre-save hooks
+    Object.assign(originalOrder, req.body);
+    const order = await originalOrder.save();
     
     // Create audit log
     createAuditLog('UPDATE', 'LAUNDRY', order._id, req.user?.id, req.user?.role, originalOrder.toObject(), order.toObject(), req);
