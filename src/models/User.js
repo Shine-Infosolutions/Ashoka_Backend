@@ -5,10 +5,21 @@ const userSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
-  role: { type: String, enum: ['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK'], required: true },
+  role: { type: String, enum: ['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK', 'RESTAURANT'], required: true },
   status: { type: String, enum: ['active', 'inactive'], default: 'active' },
+  isActive: { type: Boolean, default: true },
+  
+  // Restaurant specific fields
+  restaurantRole: { type: String, enum: ['staff', 'cashier', 'chef'] },
+  
+  // Department field for staff
+  department: [{
+    id: Number,
+    name: String
+  }],
   
   // Optional fields - to be updated by admin later
+  name: { type: String },
   validId: { 
     type: String, 
     enum: ['aadhar', 'pan', 'passport', 'driving_license', 'voter_id']

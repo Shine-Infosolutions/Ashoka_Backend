@@ -27,7 +27,7 @@ const createAuditLog = (action, recordId, userId, userRole, oldData, newData, re
 // Add new user
 exports.addUser = async (req, res) => {
   try {
-    const { username, email, phoneNumber, password, role } = req.body;
+    const { username, email, phoneNumber, password, role, restaurantRole, department, name } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
@@ -41,7 +41,10 @@ exports.addUser = async (req, res) => {
       email,
       phoneNumber,
       password,
-      role
+      role,
+      restaurantRole,
+      department,
+      name
     });
 
     await user.save();
@@ -112,7 +115,7 @@ exports.updateUser = async (req, res) => {
   }
 };
 
-// Delete user (soft delete)
+// Delete user (hard delete)
 exports.deleteUser = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -123,14 +126,10 @@ exports.deleteUser = async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const user = await User.findByIdAndUpdate(
-      userId,
-      { status: 'inactive' },
-      { new: true }
-    ).select('-password');
+    await User.findByIdAndDelete(userId);
 
     // Create audit log
-    await createAuditLog('DELETE', user._id, req.user?.id, req.user?.role, originalUser.toObject(), user.toObject(), req);
+    await createAuditLog('DELETE', userId, req.user?.id, req.user?.role, originalUser.toObject(), null, req);
 
     res.json({
       success: true,
@@ -152,11 +151,11 @@ exports.toggleUserStatus = async (req, res) => {
     }
 
     const originalData = user.toObject();
-    const newStatus = user.status === 'active' ? 'inactive' : 'active';
+    const newIsActive = user.isActive !== false ? false : true;
     
     const updatedUser = await User.findByIdAndUpdate(
       userId,
-      { status: newStatus },
+      { isActive: newIsActive, status: newIsActive ? 'active' : 'inactive' },
       { new: true }
     ).select('-password');
 
@@ -165,7 +164,7 @@ exports.toggleUserStatus = async (req, res) => {
 
     res.json({
       success: true,
-      message: `User ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully`,
+      message: `User ${newIsActive ? 'activated' : 'deactivated'} successfully`,
       user: updatedUser
     });
   } catch (error) {

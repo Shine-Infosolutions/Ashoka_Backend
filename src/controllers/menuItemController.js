@@ -4,8 +4,13 @@ const { createAuditLog } = require('../utils/auditLogger');
 // Get all menu items
 exports.getAllMenuItems = async (req, res) => {
   try {
-    const { foodType, category } = req.query;
-    let filter = { isActive: true };
+    const { foodType, category, includeInactive } = req.query;
+    let filter = {};
+    
+    // Only filter by isActive if includeInactive is not 'true'
+    if (includeInactive !== 'true') {
+      filter.isActive = true;
+    }
     
     if (foodType) {
       filter.foodType = { $in: [foodType, "Both"] };
