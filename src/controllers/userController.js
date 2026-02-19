@@ -35,17 +35,28 @@ exports.addUser = async (req, res) => {
       return res.status(400).json({ error: 'User already exists' });
     }
 
-    // Create new user (password will be hashed by pre-save middleware)
-    const user = new User({
+    // Prepare user data
+    const userData = {
       username,
       email,
       phoneNumber,
       password,
       role,
-      restaurantRole,
-      department,
       name
-    });
+    };
+
+    // Only add restaurantRole if role is RESTAURANT and restaurantRole is provided
+    if (role === 'RESTAURANT' && restaurantRole) {
+      userData.restaurantRole = restaurantRole;
+    }
+
+    // Only add department if it's provided and not empty
+    if (department && Array.isArray(department) && department.length > 0) {
+      userData.department = department;
+    }
+
+    // Create new user (password will be hashed by pre-save middleware)
+    const user = new User(userData);
 
     await user.save();
 
