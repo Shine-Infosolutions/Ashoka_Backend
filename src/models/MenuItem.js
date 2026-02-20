@@ -42,7 +42,15 @@ const menuItemSchema = new mongoose.Schema({
   image: {
     type: String,
     trim: true
-  }
+  },
+  variations: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Variation'
+  }],
+  addons: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Addon'
+  }]
 }, {
   timestamps: true
 });

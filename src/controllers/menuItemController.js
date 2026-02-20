@@ -1,4 +1,6 @@
 const MenuItem = require("../models/MenuItem");
+const Variation = require("../models/Variation");
+const Addon = require("../models/Addon");
 const { createAuditLog } = require('../utils/auditLogger');
 
 // Get all menu items
@@ -7,7 +9,6 @@ exports.getAllMenuItems = async (req, res) => {
     const { foodType, category, includeInactive } = req.query;
     let filter = {};
     
-    // Only filter by isActive if includeInactive is not 'true'
     if (includeInactive !== 'true') {
       filter.isActive = true;
     }
@@ -17,9 +18,54 @@ exports.getAllMenuItems = async (req, res) => {
     }
     if (category) filter.category = category;
     
-    const items = await MenuItem.find(filter).sort({ category: 1, name: 1 });
-    res.json({ success: true, menuItems: items, data: items });
+    const items = await MenuItem.find(filter)
+      .populate('variations')
+      .populate('addons')
+      .sort({ category: 1, name: 1 });
+    
+    const transformedItems = items.map(item => {
+      const itemObj = item.toObject();
+      
+      // Build variation array for order system
+      let variationArray = [];
+      if (itemObj.variations && itemObj.variations.length > 0) {
+        // If item has variations, use them
+        variationArray = itemObj.variations.map(v => ({
+          _id: v._id.toString(),
+          name: v.name,
+          price: v.price
+        }));
+      } else {
+        // If no variations, use default
+        variationArray = [{ _id: itemObj._id + '_default', name: 'Regular', price: itemObj.Price }];
+      }
+      
+      return {
+        _id: itemObj._id,
+        itemName: itemObj.name,
+        name: itemObj.name,
+        Price: itemObj.Price,
+        category: itemObj.category,
+        Discount: itemObj.Discount,
+        foodType: itemObj.foodType,
+        status: itemObj.isActive ? 'active' : 'inactive',
+        isActive: itemObj.isActive,
+        description: itemObj.description,
+        timeToPrepare: itemObj.timeToPrepare,
+        image: itemObj.image,
+        imageUrl: itemObj.image,
+        variations: itemObj.variations ? itemObj.variations.map(v => v._id) : [],
+        addons: itemObj.addons ? itemObj.addons.map(a => a._id) : [],
+        variation: variationArray,
+        addon: [],
+        createdAt: itemObj.createdAt,
+        updatedAt: itemObj.updatedAt
+      };
+    });
+    
+    res.json({ success: true, menuItems: transformedItems, data: transformedItems });
   } catch (error) {
+    console.error('Get menu items error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -27,7 +73,7 @@ exports.getAllMenuItems = async (req, res) => {
 // Add new menu item
 exports.addMenuItem = async (req, res) => {
   try {
-    const { name, Price, category, Discount, foodType, isActive, description, timeToPrepare, image } = req.body;
+    const { name, Price, category, Discount, foodType, isActive, description, timeToPrepare, image, variations, addons } = req.body;
     
     const existingItem = await MenuItem.findOne({ name, category });
     if (existingItem) {
@@ -43,7 +89,9 @@ exports.addMenuItem = async (req, res) => {
       isActive, 
       description, 
       timeToPrepare, 
-      image 
+      image,
+      variations: variations || [],
+      addons: addons || []
     });
     await menuItem.save();
     
@@ -61,6 +109,14 @@ exports.updateMenuItem = async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
+    
+    // Ensure variations and addons are arrays
+    if (updates.variations !== undefined) {
+      updates.variations = Array.isArray(updates.variations) ? updates.variations : [];
+    }
+    if (updates.addons !== undefined) {
+      updates.addons = Array.isArray(updates.addons) ? updates.addons : [];
+    }
     
     // Get original data for audit log
     const originalMenuItem = await MenuItem.findById(id);
