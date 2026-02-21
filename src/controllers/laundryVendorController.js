@@ -1,5 +1,4 @@
 const LaundryVendor = require("../models/LaundryVendor");
-const cloudinary = require("../utils/cloudinary");
 
 // Get all vendors
 exports.getAllVendors = async (req, res) => {
@@ -31,18 +30,9 @@ exports.createVendor = async (req, res) => {
     
     let uploadedImageUrl = null;
     
-    // Handle base64 image upload
+    // Store base64 image directly
     if (scannerImg && scannerImg.startsWith('data:image/')) {
-      try {
-        const uploadResult = await cloudinary.uploader.upload(scannerImg, {
-          folder: 'havan-booking-media',
-          public_id: `vendor-${Date.now()}`,
-          transformation: [{ width: 800, height: 800, crop: 'limit' }]
-        });
-        uploadedImageUrl = uploadResult.secure_url;
-      } catch (uploadError) {
-        return res.status(400).json({ error: 'Image upload failed' });
-      }
+      uploadedImageUrl = scannerImg;
     }
     
     const vendor = new LaundryVendor({
@@ -82,18 +72,9 @@ exports.updateVendor = async (req, res) => {
       remarks
     };
     
-    // Handle base64 image upload
+    // Store base64 image directly
     if (scannerImg && scannerImg.startsWith('data:image/')) {
-      try {
-        const uploadResult = await cloudinary.uploader.upload(scannerImg, {
-          folder: 'havan-booking-media',
-          public_id: `vendor-${Date.now()}`,
-          transformation: [{ width: 800, height: 800, crop: 'limit' }]
-        });
-        updateData.scannerImg = uploadResult.secure_url;
-      } catch (uploadError) {
-        return res.status(400).json({ error: 'Image upload failed' });
-      }
+      updateData.scannerImg = scannerImg;
     }
     
     const vendor = await LaundryVendor.findByIdAndUpdate(

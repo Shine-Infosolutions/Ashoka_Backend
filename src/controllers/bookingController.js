@@ -3,7 +3,6 @@ const Category = require("../models/Category.js");
 const Room = require("../models/Room.js");
 const { getAuditLogModel } = require('../models/AuditLogModel');
 const mongoose = require('mongoose');
-const cloudinary = require('../utils/cloudinary');
 
 // Dynamic tax rates - can be modified as needed
 const TAX_RATES = {
@@ -35,24 +34,9 @@ const createAuditLog = (action, recordId, userId, userRole, oldData, newData, re
   });
 };
 
-// Upload base64 image to Cloudinary
+// Store base64 images directly (no cloud upload)
 const uploadBase64ToCloudinary = async (base64String) => {
-  try {
-    // Check if Cloudinary is properly configured
-    if (!process.env.CLOUDINARY_API_KEY || process.env.CLOUDINARY_API_KEY === 'your_api_key') {
-      console.warn('Cloudinary not configured, skipping image upload');
-      return base64String; // Return the base64 string as fallback
-    }
-    
-    const result = await cloudinary.uploader.upload(base64String, {
-      folder: 'ashoka-booking-media',
-      transformation: [{ width: 800, height: 800, crop: 'limit' }]
-    });
-    return result.secure_url;
-  } catch (error) {
-    console.warn('Image upload failed, using base64 fallback:', error.message);
-    return base64String; // Return the base64 string as fallback
-  }
+  return base64String;
 };
 
 // 🔹 Generate sequential GRC number (resets in March end)

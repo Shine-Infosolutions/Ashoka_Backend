@@ -1,5 +1,4 @@
 const Vendor = require("../models/Vendor");
-const cloudinary = require("../utils/cloudinary");
 
 // Get all vendors
 exports.getAllVendors = async (req, res) => {
