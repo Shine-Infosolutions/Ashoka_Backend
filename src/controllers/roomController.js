@@ -1,7 +1,6 @@
 const Room = require("../models/Room.js");
 const Category = require("../models/Category.js");
 const Booking = require("../models/Booking.js");
-const cloudinary = require('../utils/cloudinary');
 const { getAuditLogModel } = require('../models/AuditLogModel');
 
 // Helper function to create audit log
@@ -26,23 +25,10 @@ const createAuditLog = (action, recordId, userId, userRole, oldData, newData, re
   });
 };
 
-// Upload base64 image to Cloudinary
+// Store base64 images directly (no cloud upload)
 const uploadBase64ToCloudinary = async (base64String) => {
-  try {
-    if (!process.env.CLOUDINARY_API_KEY || process.env.CLOUDINARY_API_KEY === 'your_api_key') {
-      console.warn('Cloudinary not configured, skipping image upload');
-      return base64String;
-    }
-    
-    const result = await cloudinary.uploader.upload(base64String, {
-      folder: 'ashoka-rooms',
-      transformation: [{ width: 800, height: 600, crop: 'limit' }]
-    });
-    return result.secure_url;
-  } catch (error) {
-    console.warn('Image upload failed, using base64 fallback:', error.message);
-    return base64String;
-  }
+  // Simply return the base64 string for local storage
+  return base64String;
 };
 
 // Create a new room
