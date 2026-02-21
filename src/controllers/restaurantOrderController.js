@@ -74,6 +74,15 @@ exports.createOrder = async (req, res) => {
     );
     
     orderData.items = itemsWithDetails;
+    
+    // Calculate subtotal and total
+    const subtotal = itemsWithDetails.reduce((sum, item) => sum + item.itemTotal, 0);
+    const discountAmount = orderData.discount?.percentage ? (subtotal * orderData.discount.percentage / 100) : 0;
+    const totalAmount = subtotal - discountAmount;
+    const gst = totalAmount * 0.025;
+    const sgst = totalAmount * 0.025;
+    const tableNumber = orderData.tableNumber || orderData.tableNo;
+    
     // Update table status to occupied
     if (orderData.tableNo) {
       const RestaurantTable = require('../models/RestaurantTable');
