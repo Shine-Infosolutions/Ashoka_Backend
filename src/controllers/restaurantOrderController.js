@@ -84,12 +84,25 @@ exports.createOrder = async (req, res) => {
     const tableNumber = orderData.tableNumber || orderData.tableNo;
     
     // Update table status to occupied
-    if (orderData.tableNo) {
+    if (orderData.tableNumber || orderData.tableNo) {
+      const tableNum = orderData.tableNumber || orderData.tableNo;
+      console.log('Attempting to update table:', tableNum, 'Type:', typeof tableNum);
       const RestaurantTable = require('../models/RestaurantTable');
-      await RestaurantTable.findOneAndUpdate(
-        { tableNumber: orderData.tableNo },
-        { status: 'occupied' }
-      );
+      
+      // First check if table exists
+      const existingTable = await RestaurantTable.findOne({ tableNumber: tableNum });
+      console.log('Found table:', existingTable);
+      
+      if (existingTable) {
+        const result = await RestaurantTable.findOneAndUpdate(
+          { tableNumber: tableNum },
+          { status: 'occupied' },
+          { new: true }
+        );
+        console.log('Table updated successfully:', result);
+      } else {
+        console.log('Table not found with tableNumber:', tableNum);
+      }
     }
     
     // Create order with enhanced schema
@@ -442,11 +455,19 @@ exports.updateExtraItemStatus = async (req, res) => {
 exports.processPayment = async (req, res) => {
   try {
     const { id } = req.params;
-    const { method, amount, transactionId, loyaltyPointsUsed } = req.body;
+    const { method, amount, transactionId, loyaltyPointsUsed, discountPercentage } = req.body;
 
     const order = await RestaurantOrder.findById(id);
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
+    }
+
+    // Save discount if provided
+    if (discountPercentage && discountPercentage > 0) {
+      order.discount = {
+        percentage: discountPercentage,
+        amount: (order.subtotal || order.totalAmount) * discountPercentage / 100
+      };
     }
 
     order.status = 'PAID';
