@@ -73,37 +73,14 @@ exports.createOrder = async (req, res) => {
       })
     );
     
-    // Calculate totals
-    const subtotal = itemsWithDetails.reduce((sum, item) => sum + (item.isFree ? 0 : item.itemTotal), 0);
-    const gst = orderData.gst || 0;
-    const sgst = orderData.sgst || 0;
-    const totalAmount = subtotal + gst + sgst;
-    
-    // Get table details and update status to occupied
-    let tableNumber = orderData.tableNumber || orderData.tableNo;
-    if (orderData.tableId) {
-      try {
-        const table = await RestaurantTable.findByIdAndUpdate(
-          orderData.tableId,
-          { status: 'occupied' },
-          { new: true }
-        );
-        if (table) {
-          tableNumber = table.tableNumber;
-        }
-      } catch (tableError) {
-        console.error('Table update error:', tableError);
-      }
-    } else if (tableNumber) {
-      try {
-        await RestaurantTable.findOneAndUpdate(
-          { tableNumber },
-          { status: 'occupied' },
-          { new: true }
-        );
-      } catch (tableError) {
-        console.error('Table update error:', tableError);
-      }
+    orderData.items = itemsWithDetails;
+    // Update table status to occupied
+    if (orderData.tableNo) {
+      const RestaurantTable = require('../models/RestaurantTable');
+      await RestaurantTable.findOneAndUpdate(
+        { tableNumber: orderData.tableNo },
+        { status: 'occupied' }
+      );
     }
     
     // Create order with enhanced schema

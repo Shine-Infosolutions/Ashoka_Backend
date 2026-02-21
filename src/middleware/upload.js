@@ -6,17 +6,16 @@ const path = require("path");
 const allowedFormats = ["jpg", "jpeg", "png", "webp"];
 
 const storage = new CloudinaryStorage({
-  cloudinary,
-  params: async (req, file) => {
-    const nameWithoutExt = path.parse(file.originalname).name;
-
-    return {
-      folder: "havan-booking-media",
-      allowed_formats: allowedFormats,
-      public_id: `${Date.now()}-${nameWithoutExt}`,
-      resource_type: "image",
-      transformation: [{ width: 800, height: 800, crop: "limit" }],
-    };
+  cloudinary: cloudinary,
+  params: {
+    folder: "havan-booking-media",
+    allowed_formats: allowedFormats,
+    public_id: (req, file) => {
+      const nameWithoutExt = path.parse(file.originalname).name;
+      return `${Date.now()}-${nameWithoutExt}`;
+    },
+    resource_type: "image",
+    transformation: [{ width: 800, height: 800, crop: "limit" }],
   },
 });
 
