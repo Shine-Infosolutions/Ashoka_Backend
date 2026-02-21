@@ -49,6 +49,9 @@ const billRoutes = require("./src/routes/billRoutes.js");
 const inRoomOrderRoutes = require("./src/routes/inRoomOrderRoutes.js");
 const variationRoutes = require("./src/routes/variation.js");
 const addonRoutes = require("./src/routes/addon.js");
+const customerRoutes = require("./src/routes/customerRoutes.js");
+const splitBillRoutes = require("./src/routes/splitBillRoutes.js");
+const loyaltyRoutes = require("./src/routes/loyaltyRoutes.js");
 
 const { connectAuditDB } = require("./src/config/auditDatabase.js");
 const { optimizeDatabase } = require("./src/utils/dbOptimization.js");
@@ -192,6 +195,9 @@ app.use("/api/bills", billRoutes);
 app.use("/api/inroom-orders", inRoomOrderRoutes);
 app.use("/api/variations", variationRoutes);
 app.use("/api/addons", addonRoutes);
+app.use("/api/customers", customerRoutes);
+app.use("/api/split-bill", splitBillRoutes);
+app.use("/api/loyalty", loyaltyRoutes);
 
 // Health check endpoint
 app.get("/health", async (req, res) => {

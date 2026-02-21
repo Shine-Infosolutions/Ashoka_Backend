@@ -23,12 +23,8 @@ exports.createTable = async (req, res) => {
 exports.updateTableStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
-    const table = await RestaurantTable.findByIdAndUpdate(
-      id,
-      { status },
-      { new: true }
-    );
+    const updateData = req.body.status ? { status: req.body.status } : req.body;
+    const table = await RestaurantTable.findByIdAndUpdate(id, updateData, { new: true });
     res.json(table);
   } catch (error) {
     res.status(400).json({ message: error.message });
