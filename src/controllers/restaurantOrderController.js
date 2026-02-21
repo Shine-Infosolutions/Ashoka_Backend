@@ -27,7 +27,6 @@ exports.createOrder = async (req, res) => {
     );
     
     orderData.items = itemsWithDetails;
-    
     // Update table status to occupied
     if (orderData.tableNo) {
       const RestaurantTable = require('../models/RestaurantTable');
