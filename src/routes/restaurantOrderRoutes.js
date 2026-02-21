@@ -33,4 +33,18 @@ router.patch('/:id/add-transaction', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS',
 // Get invoice
 router.get('/invoice/:id', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), restaurantOrderController.getInvoice);
 
+// NEW ENHANCED ROUTES FOR ORDER & KOT SYSTEM
+
+// Update item status in order
+router.patch('/:orderId/item-status/:itemIndex', auth, authorize(['ADMIN', 'GM', 'STAFF', 'FRONT DESK']), restaurantOrderController.updateItemStatus);
+
+// Add extra items to existing order
+router.post('/:orderId/extra-items', auth, authorize(['ADMIN', 'GM', 'STAFF', 'FRONT DESK']), restaurantOrderController.addExtraItems);
+
+// Update extra item status
+router.patch('/:orderId/extra-item-status/:itemIndex', auth, authorize(['ADMIN', 'GM', 'STAFF', 'FRONT DESK']), restaurantOrderController.updateExtraItemStatus);
+
+// Process payment with enhanced features
+router.post('/:id/payment', auth, authorize(['ADMIN', 'GM', 'ACCOUNTS', 'STAFF', 'FRONT DESK']), restaurantOrderController.processPayment);
+
 module.exports = router;

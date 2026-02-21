@@ -9,9 +9,11 @@ const {
   deleteKitchenOrder,
   syncMissingKitchenOrders
 } = require('../controllers/kitchenOrderController');
+const kotController = require('../controllers/kotController');
 
 // Kitchen Order routes
 router.get('/', auth, authorize('ADMIN', 'GM', 'STAFF'), getAllKitchenOrders);
+router.get('/all/kitchen/orders', auth, authorize('ADMIN', 'GM', 'STAFF', 'FRONT DESK'), kotController.getKOTs);
 router.get('/:id', auth, authorize('ADMIN', 'GM', 'STAFF'), getKitchenOrderById);
 router.post('/', auth, authorize('ADMIN', 'GM', 'STAFF'), createKitchenOrder);
 router.put('/:id', auth, authorize('ADMIN', 'GM', 'STAFF'), updateKitchenOrder);
