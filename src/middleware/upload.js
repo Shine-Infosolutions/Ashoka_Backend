@@ -1,23 +1,10 @@
 const multer = require("multer");
-const { CloudinaryStorage } = require("multer-storage-cloudinary");
-const cloudinary = require("../utils/cloudinary");
 const path = require("path");
 
 const allowedFormats = ["jpg", "jpeg", "png", "webp"];
 
-const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: {
-    folder: "havan-booking-media",
-    allowed_formats: allowedFormats,
-    public_id: (req, file) => {
-      const nameWithoutExt = path.parse(file.originalname).name;
-      return `${Date.now()}-${nameWithoutExt}`;
-    },
-    resource_type: "image",
-    transformation: [{ width: 800, height: 800, crop: "limit" }],
-  },
-});
+// Use memory storage for serverless (Vercel)
+const storage = multer.memoryStorage();
 
 const upload = multer({
   storage,
@@ -27,7 +14,9 @@ const upload = multer({
     }
     cb(null, true);
   },
-
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  }
 });
 
 module.exports = upload;
